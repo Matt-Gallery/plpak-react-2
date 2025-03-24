@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Plpak</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script defer src="./queens.js"></script>
+  </head>
+  <body>
+    <section class="players">
+      <div class="name">Human</div>
+      <div class="name">Player 2</div>
+      <div class="name">Player 3</div>
+      <div class="name">Player 4</div>
+    </section>
+
+    <section class="scoreboard">
+      <div class="score"></div>
+      <div class="score"></div>
+      <div class="score"></div>
+      <div class="score"></div>
+    </section>
+
+    <section class="tophand"></section>
+
+    <section class="play">
+      <div class="hand-2"></div>
+
+      <div class="board">
+        <div class="player1"></div>
+        <div class="player2"></div>
+        <div class="player3"></div>
+        <div class="player4"></div>
+      </div>
+
+      <div class="hand-4"></div>
+    </section>
+
+    <section class="human"></section>
+
+    <section class="buttons">
+      <button class="deal">Deal</button>
+      <button class="next">Next Round</button>
+      <div class="tooltip">
+        <i class="info-icon">ℹ</i>
+        <ul><span class="tooltiptext">
+         <b>Game Rules:</b>
+          <li>The player to the left of the dealer starts</li>
+          <li>The suit of the first card played in each round is the lead suit</li>
+          <li>If you have a card of the lead suit you must play it</li>
+          <li>The player with the highest card played of the lead suit takes each trick</li>
+          <li>The player who takes the trick starts the next round</li>
+          <li>Each trick is 1 point</li>
+          <li>The lowest score wins</li>
+        </ul>
+        </span>
+      </div>
+    </section>
+  </body>
+</html>
