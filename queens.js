@@ -106,6 +106,8 @@ function dealCards() {
   // Always start the round with Player 2
   currentStarter = "player2";
   startRound(currentStarter);
+  dealButtonEl.disabled = true; 
+  nextRoundButtonEl.disabled = false;
 }
 
 // Function to clear the board of previously played cards
@@ -327,13 +329,11 @@ function determineTrickWinner() {
     .reduce((max, card) =>
       cardRanks[card.value] > cardRanks[max.value] ? card : max
     );
+  
   let winner = winningCard.player;
-  // Count the number of hearts played in this round
+  
   const queensCount = inPlay.filter((card) => card.value === "Q").length;
-
-  // Update the winner's score by the number of hearts
   score[players.indexOf(winner)] += queensCount * 2;
-
   updateScores();
 
   const totalQueensPlayed =
@@ -348,9 +348,34 @@ function determineTrickWinner() {
     document.querySelector(".tophand").innerHTML =
       '<div class="end-message">All queens have been played</div>';
     roundComplete = true;
-    return winner;
+    clearBoard();
+    resetGameState();
+    clearHands();
+    nextRoundButtonEl.disabled = true;
+    dealButtonEl.disabled = false;
   }
+
+  return winner;  // 👈 Ensure this line is always executed
 }
+
+function clearHands() {
+  players.forEach((player) => {
+    playAreas[player].innerHTML = ""; // Removes any displayed cards from the board
+  });
+  playerHands = {
+    player1: [],
+    player2: [],
+    player3: [],
+    player4: [],
+  };
+  setTimeout(() => {
+    document.querySelector(".tophand").innerHTML = "";
+    document.querySelector(".hand-2").innerHTML = "";
+    document.querySelector(".hand-4").innerHTML = "";
+    document.querySelector(".human").innerHTML = "";
+  }, 3000);
+}
+
 // Update scores
 function updateScores() {
   scoreboardEls.forEach((el, i) => (el.textContent = `${score[i]}`));

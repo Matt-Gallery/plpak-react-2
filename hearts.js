@@ -245,6 +245,14 @@ function selectCard(player, leadSuit) {
     }
   }
 
+  // Ensure currentStarter never plays a card with value "Q" unless it is their last card
+  if (player === currentStarter) {
+    const nonQueenCards = playerCards.filter((card) => card.value !== "Q");
+    if (nonQueenCards.length > 0) {
+      playerCards = nonQueenCards;
+    }
+  }
+
   // Existing logic for cases not meeting the special condition
   let validCards = leadSuit
     ? playerCards.filter((card) => card.suit === leadSuit)

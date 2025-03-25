@@ -101,7 +101,6 @@ function dealCards() {
       }
     }
   }
-
   renderHands();
 
   // Always start the round with Player 2
@@ -339,15 +338,15 @@ function determineTrickWinner() {
       cardRanks[card.value] > cardRanks[max.value] ? card : max
     );
   let winner = winningCard.player;
-  // Count the number of hearts played in this round
-  const heartsCount = inPlay.filter((card) => card.value === "Q").length;
+  // Count the number of king of hearts played in this round
+  const kingOfHearts = inPlay.filter((card) => (card.value === "Q" && card.suit = "♥")).length;
 
-  // Update the winner's score by the number of hearts
-  score[players.indexOf(winner)] += heartsCount;
+  // Update the winner's score by the number of king of hearts
+  score[players.indexOf(winner)] += (kingOfHearts * 8);
 
   updateScores();
 
-  const totalHeartsPlayed =
+  const kingPlayed =
     deck.filter((card) => card.suit === "♥").length -
     players.reduce(
       (acc, player) =>
@@ -355,7 +354,7 @@ function determineTrickWinner() {
       0
     );
 
-  if (totalHeartsPlayed === 8) {
+  if (kingPlayed === 1) {
     document.querySelector(".tophand").innerHTML =
       '<div class="end-message">All hearts have been played</div>';
     roundComplete = true;
