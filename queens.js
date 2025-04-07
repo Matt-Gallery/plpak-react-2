@@ -1,3 +1,10 @@
+// TODOs
+// 1. Implement the selectCard function to play the "Q" when a player does not have a card matching the lead suit.
+// 2. Add logic to selectCard to always play a "Q" if a higher card has been played and you're allowed to play a "Q"
+// 3. Change all alerts to be displayed in the UI instead of using the alert function.
+// 4. Fix bug where other players don't wait for human to play after they click a card of the wrong suit.
+// 5. Move buttons and info hover to the sides for better fit.
+
 /*-------------------------------- Constants --------------------------------*/
 const deck = [
   { value: "7", suit: "♥" },
@@ -81,15 +88,16 @@ const hands = {
 function dealCards() {
   if (playerHands.player1.length !== 0) return;
 
-  // Clear the board and reset game state
   clearBoard();
   resetGameState();
 
+  // Shuffle deck
   for (let i = deck.length - 1; i >= 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
 
+  // Deal cards
   let cardIndex = 0;
   while (cardIndex < deck.length) {
     for (let player of players) {
@@ -101,12 +109,11 @@ function dealCards() {
     }
   }
 
-  renderHands();
+  renderHands(); // ✅ Move here
 
-  // Always start the round with Player 2
   currentStarter = "player2";
   startRound(currentStarter);
-  dealButtonEl.disabled = true; 
+  dealButtonEl.disabled = true;
   nextRoundButtonEl.disabled = false;
 }
 
@@ -174,7 +181,11 @@ async function startRound(startingPlayer) {
       await waitForPlayer1();
     } else {
       await delay(600); // Await a 400ms delay before computer plays
-      let playedCard = selectCard(player, inPlay[0]?.suit || null);
+      let playedCard = selectCard(
+        player,
+        inPlay[0]?.suit || null,
+        currentStarter
+      );
       playCardToBoard(playedCard, player);
     }
   }
@@ -192,8 +203,15 @@ function playCardToBoard(card, player) {
   playerHands[player] = playerHands[player].filter((c) => c !== card);
   inPlay.push(card);
 
-  if (hands[player].firstChild) {
-    hands[player].removeChild(hands[player].firstChild);
+  if (player !== "player1") {
+    // Re-render back-of-card images
+    hands[player].innerHTML = "";
+    for (let i = 0; i < playerHands[player].length; i++) {
+      hands[player].insertAdjacentHTML(
+        "beforeend",
+        `<img class="card back" src="static assets/playing card back.png" alt="Face Down Card" />`
+      );
+    }
   }
 
   playAreas[player].innerHTML = `<div class="card ${cardStyle[card.suit]}">${
@@ -202,53 +220,61 @@ function playCardToBoard(card, player) {
 }
 
 // Updated selectCard function with requested logic
-function selectCard(player, leadSuit) {
+function selectCard(player, leadSuit, currentStarter) {
   const playerCards = playerHands[player];
+  const isFourthPlayer = inPlay.length === 3;
+  const queensInHand = playerCards.filter((card) => card.value === "Q");
+  const hasLeadSuit = playerCards.some((card) => card.suit === leadSuit);
+  const cardsOfLeadSuit = playerCards.filter((card) => card.suit === leadSuit);
+  const inPlayLeadSuitCards = inPlay.filter((card) => card.suit === leadSuit);
+  const queenPlayedThisTrick = inPlay.some((card) => card.value === "Q");
 
-  // If no leadSuit, use existing first-player logic
-  if (!leadSuit) {
-    const valueCounts = playerCards.reduce((acc, card) => {
-      acc[card.value] = (acc[card.value] || 0) + 1;
-      return acc;
-    }, {});
-    const singleLowCards = playerCards.filter(
-      (card) => valueCounts[card.value] === 1 && cardRanks[card.value] < 5
-    );
-    if (singleLowCards.length === 1 && Math.random() < 0.5) {
-      return singleLowCards[0];
-    } else {
-      const suitCounts = playerCards.reduce((acc, card) => {
-        acc[card.suit] = (acc[card.suit] || 0) + 1;
-        return acc;
-      }, {});
-      const mostCommonSuit = Object.keys(suitCounts).reduce((a, b) =>
-        suitCounts[a] > suitCounts[b] ? a : b
-      );
-      const cardsOfMostCommonSuit = playerCards.filter(
-        (card) => card.suit === mostCommonSuit
-      );
-      return cardsOfMostCommonSuit.reduce((lowest, card) =>
+  // Rule 0: If starter is leading (no leadSuit), and has non-Queens, don't lead with a Queen
+  if (!leadSuit && player === currentStarter) {
+    const nonQueenCards = playerCards.filter((card) => card.value !== "Q");
+    if (nonQueenCards.length > 0) {
+      // Play the lowest non-queen card
+      return nonQueenCards.reduce((lowest, card) =>
         cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
       );
     }
   }
 
-  // New requested logic:
-  // If the player does not have a card matching leadSuit but has a "Q", play the "Q".
-  const validCards = playerCards.filter((card) => card.suit === leadSuit);
-  if (validCards.length === 0) {
-    const queenCard = playerCards.find((card) => card.value === "Q");
-    if (queenCard) return queenCard;
+  // Rule 1: No lead suit & has a Queen => play Queen
+  if (!hasLeadSuit && queensInHand.length > 0) {
+    return queensInHand[0];
   }
 
-  // Existing logic to select lowest card of lead suit, or highest if none.
-  return validCards.length > 0
-    ? validCards.reduce((lowest, card) =>
-        cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-      )
-    : playerCards.reduce((highest, card) =>
-        cardRanks[card.value] > cardRanks[highest.value] ? card : highest
-      );
+  // Rule 2: Has Queen of lead suit and K or A of that suit has been played => play Queen
+  const hasQueenOfLeadSuit = playerCards.find(
+    (card) => card.value === "Q" && card.suit === leadSuit
+  );
+  const kingOrAcePlayed = inPlayLeadSuitCards.some(
+    (card) => card.value === "K" || card.value === "A"
+  );
+
+  if (hasQueenOfLeadSuit && kingOrAcePlayed) {
+    return hasQueenOfLeadSuit;
+  }
+
+  // Rule 3: 4th player, no queen played yet, has lead suit => play highest of lead suit
+  if (isFourthPlayer && !queenPlayedThisTrick && cardsOfLeadSuit.length > 0) {
+    return cardsOfLeadSuit.reduce((highest, card) =>
+      cardRanks[card.value] > cardRanks[highest.value] ? card : highest
+    );
+  }
+
+  // Rule 4: No lead suit => play highest card
+  if (!hasLeadSuit) {
+    return playerCards.reduce((highest, card) =>
+      cardRanks[card.value] > cardRanks[highest.value] ? card : highest
+    );
+  }
+
+  // Default: play lowest of lead suit
+  return cardsOfLeadSuit.reduce((lowest, card) =>
+    cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
+  );
 }
 
 // Wait for Player 1 to pick a card
@@ -285,7 +311,7 @@ function handleClick(event) {
   let validCards = playerHands.player1.filter((card) => card.suit === leadSuit);
 
   if (leadSuit && validCards.length > 0 && playedCard.suit !== leadSuit) {
-    alert(`You must play a ${leadSuit} card!`);
+    showNotification(`You must play a ${leadSuit} !`);
     return;
   }
 
@@ -329,9 +355,9 @@ function determineTrickWinner() {
     .reduce((max, card) =>
       cardRanks[card.value] > cardRanks[max.value] ? card : max
     );
-  
+
   let winner = winningCard.player;
-  
+
   const queensCount = inPlay.filter((card) => card.value === "Q").length;
   score[players.indexOf(winner)] += queensCount * 2;
   updateScores();
@@ -347,20 +373,22 @@ function determineTrickWinner() {
   if (totalQueensPlayed === 4) {
     document.querySelector(".tophand").innerHTML =
       '<div class="end-message">All queens have been played</div>';
-    roundComplete = true;
-    clearBoard();
-    resetGameState();
-    clearHands();
-    nextRoundButtonEl.disabled = true;
-    dealButtonEl.disabled = false;
-  }
-
-  return winner;  // 👈 Ensure this line is always executed
+      setTimeout(() => {
+        roundComplete = true;
+        clearBoard();
+        resetGameState();
+        clearHands();
+        nextRoundButtonEl.disabled = true;
+        dealButtonEl.disabled = false;
+      }, 3000);
+    }
+  
+  return winner; // 👈 Ensure this line is always executed
 }
 
 function clearHands() {
   players.forEach((player) => {
-    playAreas[player].innerHTML = ""; // Removes any displayed cards from the board
+    playAreas[player].innerHTML = "";
   });
   playerHands = {
     player1: [],
@@ -385,7 +413,9 @@ function updateScores() {
 dealButtonEl.addEventListener("click", dealCards);
 nextRoundButtonEl.addEventListener("click", () => {
   if (inPlay.length < 4) {
-    alert("All players must play a card before proceeding to the next round!");
+    showNotification(
+      "All players must play a card before proceeding to the next round!"
+    );
     return;
   }
 
@@ -414,3 +444,25 @@ nextRoundButtonEl.addEventListener("click", () => {
   roundComplete = false;
   startRound(currentStarter);
 });
+
+// Utility functions
+function showNotification(message, duration = 2500) {
+  const container = document.querySelector(".notifications");
+
+  if (!container) return; // safety check
+
+  // Remove any existing notification
+  const existing = container.querySelector(".notification");
+  if (existing) existing.remove();
+
+  // Create new notification element
+  const notification = document.createElement("div");
+  notification.className = "notification";
+  notification.textContent = message;
+  container.appendChild(notification);
+
+  // Auto-remove after delay
+  setTimeout(() => {
+    notification.remove();
+  }, duration);
+}

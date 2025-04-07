@@ -1,3 +1,7 @@
+// Emre's project presentation notes
+// - Do not use alerts()! 
+// - Is there a win/lose state? 
+// - Leave comments in your code! 
 /*-------------------------------- Constants --------------------------------*/
 const deck = [
   { value: "7", suit: "♥" },
@@ -52,11 +56,19 @@ const cardRanks = { 7: 1, 8: 2, 9: 3, 10: 4, J: 5, Q: 6, K: 7, A: 8 };
 const players = ["player1", "player2", "player3", "player4"];
 
 /*---------------------------- Variables (state) ----------------------------*/
+// Could this be an object? :D 
+// const gameState = {
+//   playerHands: {},
+//   inPlay: [],
+//   score: [],
+//   ...etc
+// }
 let playerHands = { player1: [], player2: [], player3: [], player4: [] };
 let inPlay = [];
 let score = [0, 0, 0, 0];
 let currentStarter = "player2"; // Player 2 starts first round
 let roundComplete = false;
+let heartsPlayed = 0; // Track the total number of hearts played
 
 /*------------------------ Cached Element References ------------------------*/
 const dealButtonEl = document.querySelector(".deal");
@@ -79,8 +91,7 @@ const hands = {
 
 // Shuffle and deal cards
 function dealCards() {
-    document.querySelector(".deal").disabled = true;
-    document.querySelector(".next").disabled = false;
+  if (playerHands.player1.length !== 0) return;
 
   // Clear the board and reset game state
   clearBoard();
@@ -121,6 +132,7 @@ function clearBoard() {
 function resetGameState() {
   playerHands = { player1: [], player2: [], player3: [], player4: [] };
   roundComplete = false;
+  heartsPlayed = 0; // Reset the hearts played counter
 }
 
 // Render all players' hands and update UI
@@ -160,7 +172,6 @@ function delay(ms) {
 
 // Updated startRound function to include delay for computer players
 async function startRound(startingPlayer) {
-    
   if (roundComplete) return;
   inPlay = [];
   players.forEach((player) => (playAreas[player].innerHTML = ""));
@@ -201,141 +212,165 @@ function playCardToBoard(card, player) {
   } ${card.suit}</div>`;
 }
 
-// Updated selectCard function with requested logic
+// Updated selectCard function with new logic
 function selectCard(player, leadSuit) {
   const playerCards = playerHands[player];
-
-  // Check if the computer is the first player in the round (no leadSuit)
+  const cardsOfLeadSuit = playerCards.filter(card => card.suit === leadSuit);
+  
+  // New strategy logic
+  // 1. If first player (no lead suit)
   if (!leadSuit) {
-    // Count occurrences of card values
-    const valueCounts = playerCards.reduce((acc, card) => {
-      acc[card.value] = (acc[card.value] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Find single card occurrences with rank < 11 (J or lower)
-    const singleLowCards = playerCards.filter(
-      (card) => valueCounts[card.value] === 1 && cardRanks[card.value] < 5 // ranks 7-10 (1-4)
+    const lowHearts = playerCards.filter(card => 
+      card.suit === "♥" && (card.value === "7" || card.value === "8")
     );
-
-    if (singleLowCards.length === 1) {
-      // Randomly decide between playing the single card or existing logic
-      const randomChoice = Math.random() < 0.5;
-      if (randomChoice) {
-        return singleLowCards[0];
-      } else {
-        // Existing logic: Play lowest card of the suit they have most of
-        const suitCounts = playerCards.reduce((acc, card) => {
-          acc[card.suit] = (acc[card.suit] || 0) + 1;
-          return acc;
-        }, {});
-
-        const mostCommonSuit = Object.keys(suitCounts).reduce((a, b) =>
-          suitCounts[a] > suitCounts[b] ? a : b
-        );
-
-        const cardsOfMostCommonSuit = playerCards.filter(
-          (card) => card.suit === mostCommonSuit
-        );
-
-        return cardsOfMostCommonSuit.reduce((lowest, card) =>
-          cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
+    
+    if (lowHearts.length > 0 && Math.random() < 0.33) {
+      return lowHearts.reduce((lowest, card) => 
+        cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
+      );
+    }
+  }
+  
+  // 2. If lead suit is hearts, try to play a lower heart
+  if (leadSuit === "♥" && cardsOfLeadSuit.length > 0) {
+    const heartsPlayed = inPlay.filter(card => card.suit === "♥");
+    if (heartsPlayed.length > 0) {
+      const highestHeartPlayed = heartsPlayed.reduce((highest, card) => 
+        cardRanks[card.value] > cardRanks[highest.value] ? card : highest
+      );
+      
+      const lowerHearts = cardsOfLeadSuit.filter(card => 
+        cardRanks[card.value] < cardRanks[highestHeartPlayed.value]
+      );
+      
+      if (lowerHearts.length > 0) {
+        return lowerHearts.reduce((highest, card) => 
+          cardRanks[card.value] > cardRanks[highest.value] ? card : highest
         );
       }
     }
   }
-
-  // Ensure currentStarter never plays a card with value "Q" unless it is their last card
-  if (player === currentStarter) {
-    const nonQueenCards = playerCards.filter((card) => card.value !== "Q");
-    if (nonQueenCards.length > 0) {
-      playerCards = nonQueenCards;
-    }
-  }
-
-  // Existing logic for cases not meeting the special condition
-  let validCards = leadSuit
-    ? playerCards.filter((card) => card.suit === leadSuit)
-    : playerCards;
-
-  return validCards.length > 0
-    ? validCards.reduce((lowest, card) =>
-        cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-      )
-    : playerCards.reduce((highest, card) =>
+  
+  // 3. If 4th player and no hearts played, try to win the trick
+  if (inPlay.length === 3 && !inPlay.some(card => card.suit === "♥")) {
+    if (cardsOfLeadSuit.length > 0) {
+      return cardsOfLeadSuit.reduce((highest, card) => 
         cardRanks[card.value] > cardRanks[highest.value] ? card : highest
       );
+    }
+  }
+  
+  // Default logic
+  if (!leadSuit) {
+    // Play lowest card of most common suit
+    const suitCounts = playerCards.reduce((acc, card) => {
+      acc[card.suit] = (acc[card.suit] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const mostCommonSuit = Object.keys(suitCounts).reduce((a, b) =>
+      suitCounts[a] > suitCounts[b] ? a : b
+    );
+    
+    const cardsOfMostCommonSuit = playerCards.filter(card => card.suit === mostCommonSuit);
+    return cardsOfMostCommonSuit.reduce((lowest, card) =>
+      cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
+    );
+  }
+  
+  if (cardsOfLeadSuit.length > 0) {
+    return cardsOfLeadSuit.reduce((lowest, card) =>
+      cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
+    );
+  }
+  
+  // If no cards of lead suit, try to play highest heart
+  const hearts = playerCards.filter(card => card.suit === "♥");
+  if (hearts.length > 0) {
+    return hearts.reduce((highest, card) =>
+      cardRanks[card.value] > cardRanks[highest.value] ? card : highest
+    );
+  }
+  
+  // If no hearts, play highest card
+  return playerCards.reduce((highest, card) =>
+    cardRanks[card.value] > cardRanks[highest.value] ? card : highest
+  );
 }
 
 // Wait for Player 1 to pick a card
 function waitForPlayer1() {
   return new Promise((resolve) => {
-    function playerMoveHandler(event) {
-      handleClick(event);
-      hands.player1.removeEventListener("click", playerMoveHandler);
-      resolve();
-    }
-    hands.player1.addEventListener("click", playerMoveHandler);
-  });
-}
-
-// Handle Player 1 clicking a card
-function handleClick(event) {
-  const clickedCard = event.target.closest(".card"); // Ensure we get the card element
-  if (!clickedCard) return; // Exit if no valid card is clicked
-
-  const leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
-
-  // Find the clicked card in player1's hand
-  let playedCardIndex = playerHands.player1.findIndex(
-    (card) =>
-      card.value === clickedCard.dataset.value &&
-      card.suit === clickedCard.dataset.suit
-  );
-
-  if (playedCardIndex === -1) return; // If the card is not found, exit function
-
-  let playedCard = playerHands.player1[playedCardIndex];
-
-  // Check if Player 1 has a valid card of the leading suit
-  let validCards = playerHands.player1.filter((card) => card.suit === leadSuit);
-
-  if (leadSuit && validCards.length > 0 && playedCard.suit !== leadSuit) {
-    alert(`You must play a ${leadSuit} card!`);
-    return;
-  }
-
-  // Remove the played card from Player 1's hand array
-  playerHands.player1.splice(playedCardIndex, 1);
-
-  // Play the selected card
-  playCardToBoard(playedCard, "player1");
-
-  // Re-render the hand to reflect the removal
-  renderHands();
-
-  // Disable further clicks until next round
-  hands.player1.querySelectorAll(".card").forEach((card) => {
-    card.removeEventListener("click", handleClick);
-  });
-}
-
-// Ensure clicks are enabled again when it's Player 1's turn
-function waitForPlayer1() {
-  return new Promise((resolve) => {
-    function playerMoveHandler(event) {
-      handleClick(event);
-      hands.player1.removeEventListener("click", playerMoveHandler);
-      resolve();
-    }
-
     // Re-enable clicks only at the start of Player 1's turn
     hands.player1.querySelectorAll(".card").forEach((card) => {
       card.addEventListener("click", handleClick);
     });
-
+    
+    function playerMoveHandler(event) {
+      const clickedCard = event.target.closest(".card");
+      if (!clickedCard) return; // Exit if no valid card is clicked
+      
+      const leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
+      
+      // Find the clicked card in player1's hand
+      let playedCardIndex = playerHands.player1.findIndex(
+        (card) =>
+          card.value === clickedCard.dataset.value &&
+          card.suit === clickedCard.dataset.suit
+      );
+      
+      if (playedCardIndex === -1) return; // If the card is not found, exit function
+      
+      let playedCard = playerHands.player1[playedCardIndex];
+      
+      // Check if Player 1 has a valid card of the leading suit
+      let validCards = playerHands.player1.filter((card) => card.suit === leadSuit);
+      
+      if (leadSuit && validCards.length > 0 && playedCard.suit !== leadSuit) {
+        // Show notification but don't resolve the promise
+        showNotification(`You must play a ${leadSuit} card!`);
+        return;
+      }
+      
+      // If we get here, a valid card was played
+      // Remove the played card from Player 1's hand array
+      playerHands.player1.splice(playedCardIndex, 1);
+      
+      // Play the selected card
+      playCardToBoard(playedCard, "player1");
+      
+      // Re-render the hand to reflect the removal
+      renderHands();
+      
+      // Disable further clicks until next round
+      hands.player1.querySelectorAll(".card").forEach((card) => {
+        card.removeEventListener("click", handleClick);
+      });
+      
+      // Remove the event listener and resolve the promise
+      hands.player1.removeEventListener("click", playerMoveHandler);
+      resolve();
+    }
+    
     hands.player1.addEventListener("click", playerMoveHandler);
   });
+}
+
+// Show a notification message
+function showNotification(message) {
+  const notificationsEl = document.querySelector(".notifications");
+  notificationsEl.innerHTML = `<div class="notification">${message}</div>`;
+  
+  // Clear the notification after 3 seconds
+  setTimeout(() => {
+    notificationsEl.innerHTML = "";
+  }, 3000);
+}
+
+// Handle Player 1 clicking a card - this function is now only used for adding event listeners
+function handleClick(event) {
+  // This function is now just a placeholder for the event listener
+  // The actual card playing logic is in the playerMoveHandler function in waitForPlayer1
 }
 
 // Determine the trick winner
@@ -347,33 +382,30 @@ function determineTrickWinner() {
       cardRanks[card.value] > cardRanks[max.value] ? card : max
     );
   let winner = winningCard.player;
-  // Count the number of hearts played in this round
-  const heartsCount = inPlay.filter((card) => card.suit === "♥").length;
-
-  // Update the winner's score by the number of hearts
-  score[players.indexOf(winner)] += heartsCount;
-
+  
+  // Count hearts in the trick
+  let heartsInTrick = inPlay.filter(card => card.suit === "♥").length;
+  
+  // Update the total hearts played
+  heartsPlayed += heartsInTrick;
+  
+  // Award points based on hearts taken (1 point per heart)
+  score[players.indexOf(winner)] += heartsInTrick;
+  
   updateScores();
-
-  const totalHeartsPlayed =
-    deck.filter((card) => card.suit === "♥").length -
-    players.reduce(
-      (acc, player) =>
-        acc + playerHands[player].filter((card) => card.suit === "♥").length,
-      0
-    );
-
-  if (totalHeartsPlayed === 8) {
-    document.querySelector(".tophand").innerHTML =
-      '<div class="end-message">All hearts have been played</div>';
+  
+  // Check if the game should end (8 hearts played)
+  if (heartsPlayed >= 8) {
     roundComplete = true;
-    dealButtonEl.disabled = false;
-    nextRoundButtonEl.disabled = true; // Disable the next button
-    clearBoard();
-    resetGameState();
-    return; // Ensure the function exits here
+    dealButtonEl.disabled = false; // Enable the deal button
+    nextRoundButtonEl.disabled = false; // Enable the next round button
+    console.log("Game over! 8 hearts have been played.");
+    
+    // Display a simple message that all hearts have been played
+    document.querySelector(".tophand").innerHTML = `<div class="winner-message">All hearts have been played</div>`;
+    showNotification("Please deal next hand");
   }
-
+  
   return winner;
 }
 
@@ -386,20 +418,17 @@ function updateScores() {
 dealButtonEl.addEventListener("click", dealCards);
 nextRoundButtonEl.addEventListener("click", () => {
   if (inPlay.length < 4) {
-    alert("All players must play a card before proceeding to the next round!");
+    showNotification("All players must play a card before proceeding to the next round!");
+    return;
+  }
+
+  if (heartsPlayed >= 8) {
+    showNotification("Please deal next hand");
     return;
   }
 
   function checkGameOver() {
-    const totalHeartsPlayed =
-      deck.filter((card) => card.suit === "♥").length -
-      players.reduce(
-        (acc, player) =>
-          acc + playerHands[player].filter((card) => card.suit === "♥").length,
-        0
-      );
-
-    if (totalHeartsPlayed === 8) {
+    if (players.every((player) => playerHands[player].length === 0)) {
       let minScore = Math.min(...score);
       let winners = players.filter((_, index) => score[index] === minScore);
 
@@ -415,10 +444,6 @@ nextRoundButtonEl.addEventListener("click", () => {
       document.querySelector(
         ".tophand"
       ).innerHTML = `<div class="winner-message">${message}</div>`;
-      nextRoundButtonEl.disabled = true; // Disable the next button
-      clearBoard();
-      resetGameState();
-      return; // Ensure the function exits here
     }
   }
 

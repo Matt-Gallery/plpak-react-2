@@ -57,6 +57,7 @@ let inPlay = [];
 let score = [0, 0, 0, 0];
 let currentStarter = "player2"; // Player 2 starts first round
 let roundComplete = false;
+let kingOfHeartsPlayed = false;
 
 /*------------------------ Cached Element References ------------------------*/
 const dealButtonEl = document.querySelector(".deal");
@@ -74,13 +75,13 @@ const hands = {
   player3: document.querySelector(".tophand"),
   player4: document.querySelector(".hand-4"),
 };
+const notificationsEl = document.querySelector(".notifications");
 
 /*-------------------------------- Functions --------------------------------*/
 
 // Shuffle and deal cards
 function dealCards() {
-    document.querySelector(".deal").disabled = true;
-    document.querySelector(".next").disabled = false;
+  if (playerHands.player1.length !== 0) return;
 
   // Clear the board and reset game state
   clearBoard();
@@ -101,6 +102,7 @@ function dealCards() {
       }
     }
   }
+
   renderHands();
 
   // Always start the round with Player 2
@@ -120,6 +122,7 @@ function clearBoard() {
 function resetGameState() {
   playerHands = { player1: [], player2: [], player3: [], player4: [] };
   roundComplete = false;
+  kingOfHeartsPlayed = false;
 }
 
 // Render all players' hands and update UI
@@ -159,7 +162,6 @@ function delay(ms) {
 
 // Updated startRound function to include delay for computer players
 async function startRound(startingPlayer) {
-    
   if (roundComplete) return;
   inPlay = [];
   players.forEach((player) => (playAreas[player].innerHTML = ""));
@@ -172,7 +174,7 @@ async function startRound(startingPlayer) {
     if (player === "player1") {
       await waitForPlayer1();
     } else {
-      await delay(600); // Await a 400ms delay before computer plays
+      await delay(600); // Await a 600ms delay before computer plays
       let playedCard = selectCard(player, inPlay[0]?.suit || null);
       playCardToBoard(playedCard, player);
     }
@@ -200,62 +202,62 @@ function playCardToBoard(card, player) {
   } ${card.suit}</div>`;
 }
 
-// Updated selectCard function with requested logic
+// Select a card for computer players
 function selectCard(player, leadSuit) {
   const playerCards = playerHands[player];
 
-  // Check if the computer is the first player in the round (no leadSuit)
+  // If this is the first card of the trick
   if (!leadSuit) {
-    // Count occurrences of card values
-    const valueCounts = playerCards.reduce((acc, card) => {
-      acc[card.value] = (acc[card.value] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Find single card occurrences with rank < 11 (J or lower)
-    const singleLowCards = playerCards.filter(
-      (card) => valueCounts[card.value] === 1 && cardRanks[card.value] < 5 // ranks 7-10 (1-4)
+    // Try to avoid playing the King of Hearts
+    const nonKingOfHeartsCards = playerCards.filter(
+      (card) => !(card.value === "K" && card.suit === "♥")
     );
-
-    if (singleLowCards.length === 1) {
-      // Randomly decide between playing the single card or existing logic
-      const randomChoice = Math.random() < 0.5;
-      if (randomChoice) {
-        return singleLowCards[0];
-      } else {
-        // Existing logic: Play lowest card of the suit they have most of
-        const suitCounts = playerCards.reduce((acc, card) => {
-          acc[card.suit] = (acc[card.suit] || 0) + 1;
-          return acc;
-        }, {});
-
-        const mostCommonSuit = Object.keys(suitCounts).reduce((a, b) =>
-          suitCounts[a] > suitCounts[b] ? a : b
-        );
-
-        const cardsOfMostCommonSuit = playerCards.filter(
-          (card) => card.suit === mostCommonSuit
-        );
-
-        return cardsOfMostCommonSuit.reduce((lowest, card) =>
-          cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-        );
-      }
+    
+    if (nonKingOfHeartsCards.length > 0) {
+      // Play the lowest non-King of Hearts card
+      return nonKingOfHeartsCards.reduce((lowest, card) =>
+        cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
+      );
+    } else {
+      // If all cards are King of Hearts, play the first card
+      return playerCards[0];
     }
   }
 
-  // Existing logic for cases not meeting the special condition
-  let validCards = leadSuit
-    ? playerCards.filter((card) => card.suit === leadSuit)
-    : playerCards;
-
-  return validCards.length > 0
-    ? validCards.reduce((lowest, card) =>
+  // If there's a lead suit, try to follow suit
+  let validCards = playerCards.filter((card) => card.suit === leadSuit);
+  
+  if (validCards.length > 0) {
+    // If we can follow suit, play the lowest card that will win the trick
+    const highestCardInTrick = inPlay.reduce((highest, play) => {
+      if (play.card.suit === leadSuit && cardRanks[play.card.value] > cardRanks[highest.value]) {
+        return play.card;
+      }
+      return highest;
+    }, inPlay[0].card);
+    
+    // Find the lowest card that can beat the highest card in the trick
+    const winningCards = validCards.filter(
+      (card) => cardRanks[card.value] > cardRanks[highestCardInTrick.value]
+    );
+    
+    if (winningCards.length > 0) {
+      // Play the lowest winning card
+      return winningCards.reduce((lowest, card) =>
         cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-      )
-    : playerCards.reduce((highest, card) =>
-        cardRanks[card.value] > cardRanks[highest.value] ? card : highest
       );
+    } else {
+      // If we can't win, play the lowest card
+      return validCards.reduce((lowest, card) =>
+        cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
+      );
+    }
+  } else {
+    // If we can't follow suit, play the highest card
+    return playerCards.reduce((highest, card) =>
+      cardRanks[card.value] > cardRanks[highest.value] ? card : highest
+    );
+  }
 }
 
 // Wait for Player 1 to pick a card
@@ -292,7 +294,7 @@ function handleClick(event) {
   let validCards = playerHands.player1.filter((card) => card.suit === leadSuit);
 
   if (leadSuit && validCards.length > 0 && playedCard.suit !== leadSuit) {
-    alert(`You must play a ${leadSuit} card!`);
+    showNotification(`You must play a ${leadSuit} card!`);
     return;
   }
 
@@ -302,30 +304,17 @@ function handleClick(event) {
   // Play the selected card
   playCardToBoard(playedCard, "player1");
 
+  // Check if the King of Hearts was played
+  if (playedCard.value === "K" && playedCard.suit === "♥") {
+    kingOfHeartsPlayed = true;
+  }
+
   // Re-render the hand to reflect the removal
   renderHands();
 
   // Disable further clicks until next round
   hands.player1.querySelectorAll(".card").forEach((card) => {
     card.removeEventListener("click", handleClick);
-  });
-}
-
-// Ensure clicks are enabled again when it's Player 1's turn
-function waitForPlayer1() {
-  return new Promise((resolve) => {
-    function playerMoveHandler(event) {
-      handleClick(event);
-      hands.player1.removeEventListener("click", playerMoveHandler);
-      resolve();
-    }
-
-    // Re-enable clicks only at the start of Player 1's turn
-    hands.player1.querySelectorAll(".card").forEach((card) => {
-      card.addEventListener("click", handleClick);
-    });
-
-    hands.player1.addEventListener("click", playerMoveHandler);
   });
 }
 
@@ -338,33 +327,20 @@ function determineTrickWinner() {
       cardRanks[card.value] > cardRanks[max.value] ? card : max
     );
   let winner = winningCard.player;
-  // Count the number of king of hearts played in this round
-  const kingOfHearts = inPlay.filter((card) => (card.value === "Q" && card.suit = "♥")).length;
-
-  // Update the winner's score by the number of king of hearts
-  score[players.indexOf(winner)] += (kingOfHearts * 8);
-
-  updateScores();
-
-  const kingPlayed =
-    deck.filter((card) => card.suit === "♥").length -
-    players.reduce(
-      (acc, player) =>
-        acc + playerHands[player].filter((card) => (card.suit === "♥" && card.value === "K")).length,
-      0
-    );
-
-  if (kingPlayed === 1) {
-    document.querySelector(".tophand").innerHTML =
-      '<div class="end-message">All hearts have been played</div>';
-    roundComplete = true;
-    dealButtonEl.disabled = false;
-    dealButton.onclick = dealCards;
-    nextRoundButtonEl.disabled = true;
-    clearBoard();
-    resetGameState();
+  
+  // Check if the King of Hearts was played
+  let kingOfHeartsInTrick = inPlay.some(
+    (card) => card.value === "K" && card.suit === "♥"
+  );
+  
+  if (kingOfHeartsInTrick) {
+    score[players.indexOf(winner)] += 13;
+    showNotification(`${winnerStyle[winner]} wins the trick and gets 13 points for playing the King of Hearts!`);
+  } else {
+    showNotification(`${winnerStyle[winner]} wins the trick!`);
   }
-
+  
+  updateScores();
   return winner;
 }
 
@@ -373,18 +349,26 @@ function updateScores() {
   scoreboardEls.forEach((el, i) => (el.textContent = `${score[i]}`));
 }
 
+// Show notification
+function showNotification(message) {
+  notificationsEl.innerHTML = `<div class="notification">${message}</div>`;
+  setTimeout(() => {
+    notificationsEl.innerHTML = "";
+  }, 3000);
+}
+
 // Event Listeners
 dealButtonEl.addEventListener("click", dealCards);
 nextRoundButtonEl.addEventListener("click", () => {
   if (inPlay.length < 4) {
-    alert("All players must play a card before proceeding to the next round!");
+    showNotification("All players must play a card before proceeding to the next round!");
     return;
   }
 
   function checkGameOver() {
     if (players.every((player) => playerHands[player].length === 0)) {
-      let minScore = Math.min(...score);
-      let winners = players.filter((_, index) => score[index] === minScore);
+      let maxScore = Math.max(...score);
+      let winners = players.filter((_, index) => score[index] === maxScore);
 
       let translatedWinners = winners.map((winner) => winnerStyle[winner]);
 
@@ -392,8 +376,8 @@ nextRoundButtonEl.addEventListener("click", () => {
         translatedWinners.length > 1
           ? `It's a tie between ${translatedWinners.join(
               " and "
-            )} with ${minScore} points!`
-          : `${translatedWinners[0]} wins with ${minScore} points!`;
+            )} with ${maxScore} points!`
+          : `${translatedWinners[0]} wins with ${maxScore} points!`;
 
       document.querySelector(
         ".tophand"
