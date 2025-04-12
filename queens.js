@@ -164,6 +164,18 @@ async function startTrick(startingPlayer) {
           controllerActiveGameRef.updateStarter(currentStarter);
           roundOver = checkRoundOver(playerHands, totalQueensPlayed); // Check if round ends
 
+          // Check if round over and determine the notification message
+          if (roundOver) {
+              console.log("Queens.js: Round Over condition met after trick.");
+              if (totalQueensPlayed >= 4) {
+                  // Specific message if all queens were played
+                  controllerShowNotification("All queens have been played. Click Deal.");
+              } else {
+                  // Generic message if round ended due to empty hands before 4 queens
+                  controllerShowNotification(`Queens Round Over! Click Deal.`);
+              }
+          }
+
       } else if (roundOver) {
            console.log("Queens.js: Trick processing skipped as round ended mid-trick.");
       } else {

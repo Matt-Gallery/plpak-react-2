@@ -190,6 +190,20 @@ async function startTrick(startingPlayer) {
             controllerActiveGameRef.updateStarter(currentStarter);
             roundOver = checkRoundOver(playerHands, totalHeartsPlayed); // Check if round ends
 
+            // Check if round over and determine the notification message
+            if (roundOver) {
+                console.log("Hearts.js: Round Over condition met after trick.");
+                if (totalHeartsPlayed >= 8) {
+                    // Specific message if all hearts were played
+                    controllerShowNotification("All hearts have been played. Click Deal."); 
+                } else {
+                    // Generic message if round ended due to empty hands before 8 hearts
+                    controllerShowNotification(`Hearts Round Over! Click Deal.`); 
+                }
+            } else {
+                 // Log if trick finished but round continues
+                 console.log(`Hearts.js: Trick complete. Next starter: ${currentStarter}. Waiting for next action.`);
+            }
         } else if (roundOver) {
              console.log("Hearts.js: Trick processing skipped as round ended mid-trick.");
         } else {

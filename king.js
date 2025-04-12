@@ -257,57 +257,96 @@ function selectCard_AI(player, leadSuit, starter, isFirstTrick) {
   const kingOfHearts = playerCards.find(card => card.value === 'K' && card.suit === '♥');
   const nonKingHearts = heartsInHand.filter(card => card.value !== 'K');
 
-  // Rule 1: First trick, starter cannot lead with a heart (if they have other suits)
-  if (isFirstTrick && player === starter && isLeading) {
-    const nonHearts = playerCards.filter(card => card.suit !== '♥');
-    if (nonHearts.length > 0) {
-      return nonHearts.reduce((lowest, card) => cardRanks_king[card.value] < cardRanks_king[lowest.value] ? card : lowest);
-    }
-  }
+  // --- Rule: First trick logic --- 
+  if (isFirstTrick && isLeading) {
+      console.log(`King.js AI (${player}): Leading first trick.`);
+      // 1. Cannot lead with a heart (unless only hearts are held)
+      const nonHearts = playerCards.filter(card => card.suit !== '♥');
+      if (nonHearts.length === 0) {
+          // Only has hearts, lead lowest heart (must be non-king if possible)
+          console.log(`King.js AI (${player}): Only has hearts, leading lowest.`);
+          if (nonKingHearts.length > 0) {
+              return nonKingHearts.reduce((lowest, card) => cardRanks_king[card.value] < cardRanks_king[lowest.value] ? card : lowest);
+          }
+          return kingOfHearts; // Must lead King if it's the only heart
+      }
 
-  // Must Follow Suit
+      // 2. Check for singleton K or A in non-heart suits
+      const suitsInHand = [...new Set(nonHearts.map(card => card.suit))];
+      for (const suit of suitsInHand) {
+          const cardsInSuit = nonHearts.filter(card => card.suit === suit);
+          if (cardsInSuit.length === 1) {
+              const card = cardsInSuit[0];
+              if (card.value === 'K' || card.value === 'A') {
+                  console.log(`King.js AI (${player}): Leading singleton ${card.value}${card.suit}.`);
+                  return card; // Play the singleton King or Ace
+              }
+          }
+      }
+
+      // 3. Else, play highest non-heart card
+      console.log(`King.js AI (${player}): Leading highest non-heart.`);
+      return nonHearts.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
+  }
+  // --- End First trick logic ---
+
+  // --- Must Follow Suit --- (Not first trick or not leading)
   if (leadSuit && hasLeadSuit) {
+      console.log(`King.js AI (${player}): Following suit ${leadSuit}.`);
       // If lead suit is Hearts, try to play highest non-King heart
       if (leadSuit === '♥') {
           if (nonKingHearts.length > 0) {
-               // Play highest heart that ISN'T the King
+               console.log(`King.js AI (${player}): Playing highest non-King heart.`);
                return nonKingHearts.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
           }
           // If only King of Hearts left in suit, must play it (falls through)
+          console.log(`King.js AI (${player}): Must play King of Hearts (only heart left in suit).`);
       }
-      // Default for following suit (or if lead is Hearts but only K is left):
-      // Play the lowest card of the lead suit
+      // Default for following suit: Play the lowest card of the lead suit
+      console.log(`King.js AI (${player}): Playing lowest of lead suit ${leadSuit}.`);
       return cardsOfLeadSuit.reduce((lowest, card) => cardRanks_king[card.value] < cardRanks_king[lowest.value] ? card : lowest);
   }
 
-  // Cannot Follow Suit (or Leading after first trick)
-  // A. Leading a Trick (after first)
-  if (isLeading) {
-      // Try to lead lowest non-heart
+  // --- Cannot Follow Suit --- 
+  if (leadSuit && !hasLeadSuit) {
+      console.log(`King.js AI (${player}): Cannot follow suit ${leadSuit}. Discarding.`);
+      // Discard King of Hearts first if possible
+      if (kingOfHearts) {
+          console.log(`King.js AI (${player}): Discarding King of Hearts.`);
+          return kingOfHearts;
+      }
+      // Then discard highest other heart
+      if (heartsInHand.length > 0) { // heartsInHand here implies nonKingHearts
+          console.log(`King.js AI (${player}): Discarding highest non-King heart.`);
+          return heartsInHand.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
+      }
+      // Otherwise, discard highest card overall
+      console.log(`King.js AI (${player}): Discarding highest overall card.`);
+      return playerCards.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
+  }
+  
+  // --- Leading a Trick (NOT First Trick) --- 
+  if (isLeading) { // Note: isFirstTrick condition handled above
+      console.log(`King.js AI (${player}): Leading trick (not first).`);
+       // Try to lead lowest non-heart
       const nonHearts = playerCards.filter(card => card.suit !== '♥');
       if(nonHearts.length > 0) {
+         console.log(`King.js AI (${player}): Leading lowest non-heart.`);
          return nonHearts.reduce((lowest, card) => cardRanks_king[card.value] < cardRanks_king[lowest.value] ? card : lowest);
       }
       // If only hearts left, lead lowest non-King heart
       if(nonKingHearts.length > 0) {
+         console.log(`King.js AI (${player}): Leading lowest non-King heart.`);
          return nonKingHearts.reduce((lowest, card) => cardRanks_king[card.value] < cardRanks_king[lowest.value] ? card : lowest);
       }
       // Must lead King of Hearts if it's the only card left
+      console.log(`King.js AI (${player}): Must lead King of Hearts (only card left?).`);
       return kingOfHearts; // Assumes kingOfHearts is the only card if others are empty
   }
-  // B. Cannot Follow Suit, Discarding
-  else {
-      // Discard King of Hearts first if possible
-      if (kingOfHearts) {
-          return kingOfHearts;
-      }
-      // Then discard highest other heart
-      if (heartsInHand.length > 0) { // Should be nonKingHearts if K wasn't played
-          return heartsInHand.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
-      }
-      // Otherwise, discard highest card overall
-      return playerCards.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
-  }
+  
+  // Fallback (should not be reached in standard play)
+  console.warn(`King.js AI (${player}): Reached fallback card selection.`);
+  return playerCards[0]; // Play first available card
 }
 
 
@@ -394,20 +433,24 @@ function handleHumanClick(event) {
         return;
     }
 
-    // Validation
+    // --- Validation Rules --- 
     const hasLeadSuitOnHand = playerHands.player1.some(card => card.suit === leadSuit);
+    // Rule: Must follow suit if possible
     if (leadSuit && hasLeadSuitOnHand && playedCard.suit !== leadSuit) {
         controllerShowNotification(`You must play a ${leadSuit} card!`);
-        return;
+        return; // Wait for valid play
     }
+    
     // Rule: Can't lead hearts on first trick unless only hearts are held
     if (isFirstTrick && inPlay.length === 0 && playedCard.suit === '♥') {
         const onlyHasHearts = playerHands.player1.every(card => card.suit === '♥');
         if (!onlyHasHearts) {
+           console.log("King.js: Invalid play - Cannot lead Hearts on first trick.");
            controllerShowNotification(`You cannot lead Hearts on the first trick!`);
-           return;
+           return; // Wait for valid play
         }
    }
+   // --- End Validation --- 
 
     // Valid play
     console.log(`King.js: Human selected: ${playedCard.value}${playedCard.suit}`);

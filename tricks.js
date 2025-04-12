@@ -117,11 +117,15 @@ const deck_tricks = [
   
                if (player === "player1") {
                    humanPlayerTurn_tricks = true;
-                   playedCard = await waitForPlayer1_tricks(leadSuit);
-                   humanPlayerTurn_tricks = false; // Ensure reset after await
+                   console.log("Tricks.js: >>> Entering await waitForPlayer1_tricks"); // LOG BEFORE AWAIT
+                   playedCard = await waitForPlayer1_tricks(leadSuit); 
+                   console.log("Tricks.js: <<< Exited await waitForPlayer1_tricks"); // LOG AFTER AWAIT
+                   humanPlayerTurn_tricks = false;
                    if (!playedCard) throw new Error("Human player action failed.");
                } else {
-                   await controllerDelay(600);
+                   console.log(`Tricks.js: >>> Entering await controllerDelay for ${player}`); // LOG BEFORE AWAIT
+                   await controllerDelay(600); 
+                   console.log(`Tricks.js: <<< Exited await controllerDelay for ${player}`); // LOG AFTER AWAIT
                    playedCard = selectCard_Tricks_AI(player, leadSuit, startingPlayer, isFirstTrick_tricks);
                    if (!playedCard) throw new Error(`AI player ${player} failed to select card.`);
                }

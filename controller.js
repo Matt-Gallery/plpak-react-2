@@ -293,18 +293,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 // --- Button Handlers (Delegate to activeGame) ---
 function handleDealClick() {
     console.log("Controller: Deal Clicked.");
-    // Use controller's internal flags now, updated by game module via updateGameState
     console.log(`Controller: Checking state -> gameStarted=${gameStarted}, roundOver=${roundOver}`);
+
     if (roundOver) { 
+        // --- Action 1: Advance to next round --- 
         console.log("Controller: Round is marked over, advancing...");
         advanceToNextRound();
+
     } else if (!gameStarted && typeof activeGame.init === 'function') { 
+        // --- Action 2: Initialize current round (Deal cards) --- 
         console.log("Controller: Round not started, calling activeGame.init()...");
-        activeGame.init(); 
+        activeGame.init(); // This deals cards and should call updateGameState
+        
+        // --- NEW: Auto-start first trick for Hearts, Queens, King --- 
+        // After init() runs, gameStarted should be true and trickInProgress false.
+        // If so, immediately trigger the first trick, unless it's the Tricks round 
+        // (Tricks round auto-starts its first trick within its own init function).
+        if (gameStarted && !trickInProgress && activeGame.name !== 'tricks') {
+             console.log(`Controller: Auto-starting first trick for round: ${activeGame.name}`);
+             // Simulate clicking the "Next Trick" button
+             handleNextTrickClick(); 
+        }
+        // For Tricks round, its init function already called controllerUpdateState 
+        // with trickInProgress=true, so this block won't run, which is correct.
+
     } else if (gameStarted) {
+         // Deal clicked mid-round
          console.log("Controller: Deal clicked but round already in progress.");
-         // showNotification("Round is already in progress."); // Use shared showNotification?
+         controllerShowNotification("Round is already in progress."); 
     } else {
+         // Unexpected state
          console.error(`Controller: Deal clicked, but activeGame.init is not ready or other unexpected state!`);
     }
 }
@@ -312,12 +330,15 @@ function handleDealClick() {
 function handleNextTrickClick() {
     console.log("Controller: Next Trick Clicked.");
      // Use controller's internal flags now
-    if (roundOver || !gameStarted) {
-         console.log(`Controller: Ignoring Next Trick click (roundOver=${roundOver}, gameStarted=${gameStarted}).`);
-         return; 
+    // Prevent clicks if round is over, game not started, OR a trick is already running
+    if (roundOver || !gameStarted || trickInProgress) {
+         console.log(`Controller: Ignoring Next Trick click (roundOver=${roundOver}, gameStarted=${gameStarted}, trickInProgress=${trickInProgress}).`);
+         return;
     }
     if (typeof activeGame.startTrick === 'function') {
-        console.log("Controller: Calling activeGame.startTrick...");
+        console.log("Controller: Setting trickInProgress = true and calling activeGame.startTrick...");
+        trickInProgress = true;
+        updateButtonStates();
         activeGame.startTrick(activeGame.currentStarter);
     } else {
          console.error(`Controller: Next Trick clicked, but activeGame.startTrick is not ready!`);
