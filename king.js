@@ -310,17 +310,32 @@ function selectCard_AI(player, leadSuit, starter, isFirstTrick) {
   // --- Cannot Follow Suit --- 
   if (leadSuit && !hasLeadSuit) {
       console.log(`King.js AI (${player}): Cannot follow suit ${leadSuit}. Discarding.`);
+      
+      // --- Apply First Trick Heart Restriction --- 
+      if (isFirstTrick) {
+          const nonHearts = playerCards.filter(card => card.suit !== '♥');
+          if (nonHearts.length > 0) {
+               // Has non-hearts, MUST discard one of them (highest)
+               console.log(`King.js AI (${player}): Discarding highest non-heart (First Trick Rule).`);
+               return nonHearts.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
+          }
+          // If execution reaches here, AI only has hearts. Allow discard.
+          console.log(`King.js AI (${player}): Only has hearts, forced discard allowed (First Trick Rule).`);
+      }
+      // --- End First Trick Restriction --- 
+      
+      // Original Discard Logic (applies after first trick, or if only hearts held on first trick)
       // Discard King of Hearts first if possible
       if (kingOfHearts) {
           console.log(`King.js AI (${player}): Discarding King of Hearts.`);
           return kingOfHearts;
       }
       // Then discard highest other heart
-      if (heartsInHand.length > 0) { // heartsInHand here implies nonKingHearts
+      if (heartsInHand.length > 0) { // heartsInHand here implies nonKingHearts if K wasn't played
           console.log(`King.js AI (${player}): Discarding highest non-King heart.`);
           return heartsInHand.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
       }
-      // Otherwise, discard highest card overall
+      // Otherwise, discard highest card overall (should only happen if only non-hearts were available on first trick and this logic is reached)
       console.log(`King.js AI (${player}): Discarding highest overall card.`);
       return playerCards.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
   }
@@ -438,7 +453,7 @@ function handleHumanClick(event) {
     // Rule: Must follow suit if possible
     if (leadSuit && hasLeadSuitOnHand && playedCard.suit !== leadSuit) {
         controllerShowNotification(`You must play a ${leadSuit} card!`);
-        return; // Wait for valid play
+        return; 
     }
     
     // Rule: Can't lead hearts on first trick unless only hearts are held
@@ -447,9 +462,22 @@ function handleHumanClick(event) {
         if (!onlyHasHearts) {
            console.log("King.js: Invalid play - Cannot lead Hearts on first trick.");
            controllerShowNotification(`You cannot lead Hearts on the first trick!`);
-           return; // Wait for valid play
+           return; 
         }
    }
+   
+   // --- NEW: Stricter Rule for First Trick Discarding --- 
+   // Rule: Cannot discard a heart on the first trick unless only hearts are held
+   if (isFirstTrick && leadSuit && !hasLeadSuitOnHand && playedCard.suit === '♥') {
+       const onlyHasHearts = playerHands.player1.every(card => card.suit === '♥');
+       if (!onlyHasHearts) {
+            console.log("King.js: Invalid play - Cannot discard a Heart on first trick.");
+            controllerShowNotification(`You cannot discard a Heart on the first trick!`);
+            return; // Wait for valid play
+       }
+   }
+   // --- End Stricter Rule ---
+
    // --- End Validation --- 
 
     // Valid play

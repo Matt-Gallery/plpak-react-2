@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solitaire Round Test</title>
+    <!-- Link to existing style.css or a new one for testing -->
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Only keep styles that don't conflict with style.css */
+        body { font-family: sans-serif; padding: 10px; }
+        
+        /* Make the play section wider to accommodate a wider board */
+        .play {
+            display: flex;
+            justify-content: center;
+            position: relative;
+            width: 100%;
+            overflow: visible;
+        }
+        
+        /* Board container with increased width */
+        #solitaire-board {
+            position: relative;
+            min-height: 420px; /* Increased more significantly for visibility */
+            height: 420px !important; /* Force height to be taller */
+            width: 130% !important; /* Force wider board */
+            max-width: 800px;
+            margin: 0 auto; /* Center the board */
+            border: 2px solid darkgreen;
+            background-color: #C8E6C9;
+            flex-grow: 1;
+            transform: translateX(0); /* Reset any transform */
+            padding-top: 20px; /* Add some padding for more space */
+            padding-bottom: 20px;
+        }
+        
+        /* Adjust hand positions to account for wider board */
+        .hand-2, .hand-4 {
+            position: relative;
+            z-index: 10; /* Ensure hands appear above the expanded board */
+        }
+        
+        /* Cards on the board need absolute positioning */
+        .card.board-card {
+            position: absolute;
+            transform-origin: center center;
+            top: 50%; /* Center cards vertically */
+            margin-top: -45px; /* Offset half the card height to center properly */
+        }
+        
+        /* Playable card highlighting */
+        .card.playable {
+            cursor: pointer;
+            box-shadow: 0 0 5px 2px blue;
+        }
+        
+        /* Notifications and controls */
+        .notifications { 
+            margin-top: 10px; 
+            font-weight: bold; 
+            color: blue; 
+            min-height: 2em; 
+            text-align: center; 
+            border: 1px dashed blue; 
+            padding: 5px;
+        }
+        
+        .controls { 
+            text-align: center; 
+            margin-top: 20px; 
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Solitaire Round Test</h1>
+
+    <!-- Player names (optional) -->
+    <section class="players">
+        <div class="name">Human</div>
+        <div class="name">Player 2</div>
+        <div class="name">Player 3</div>
+        <div class="name">Player 4</div>
+    </section>
+
+    <!-- Top hand (Player 3) -->
+    <section class="tophand">
+        <!-- Cards added by JS -->
+    </section>
+
+    <!-- Middle section with side hands and board -->
+    <section class="play">
+        <!-- Left hand (Player 2) -->
+        <div class="hand-2">
+            <!-- Cards added by JS -->
+        </div>
+
+        <!-- Board area -->
+        <div id="solitaire-board" class="board">
+            <!-- Cards will be added here by JS -->
+        </div>
+
+        <!-- Right hand (Player 4) -->
+        <div class="hand-4">
+            <!-- Cards added by JS -->
+        </div>
+    </section>
+
+    <!-- Bottom hand (Player 1/Human) -->
+    <section class="human">
+        <!-- Cards added by JS -->
+    </section>
+
+    <!-- Game status and controls -->
+    <div id="solitaire-notifications" class="notifications">Game Status</div>
+    <div class="controls">
+        <button id="start-button">Start / Restart Round</button>
+    </div>
+
+    <!-- Import the solitaire module -->
+    <script type="module">
+        import { startGameSolitaire } from './solitaire.js';
+
+        // Cache DOM elements using the standard class names
+        const uiElements = {
+            p1Hand: document.querySelector('.human'),
+            p2Hand: document.querySelector('.hand-2'),
+            p3Hand: document.querySelector('.tophand'),
+            p4Hand: document.querySelector('.hand-4'),
+            board: document.getElementById('solitaire-board'),
+            notifications: document.getElementById('solitaire-notifications')
+        };
+        
+        const startButton = document.getElementById('start-button');
+
+        // Add event listener to start button
+        startButton.addEventListener('click', () => {
+            console.log("Start button clicked");
+            if (!uiElements.p1Hand || !uiElements.p2Hand || !uiElements.p3Hand || !uiElements.p4Hand || !uiElements.board || !uiElements.notifications) {
+                console.error("One or more UI elements not found! Check selectors.");
+                uiElements.notifications.textContent = 'ERROR: UI elements missing!';
+                return;
+            }
+            
+            // Clear board and notifications for restart
+            uiElements.board.innerHTML = '';
+            uiElements.notifications.textContent = 'Starting...';
+
+            try {
+                startGameSolitaire(uiElements);
+            } catch (error) {
+                console.error("Error initializing solitaire game:", error);
+                if (uiElements.notifications) {
+                    uiElements.notifications.textContent = 'Error starting game. See console.';
+                }
+            }
+        });
+
+        console.log("Test HTML script loaded and ready.");
+    </script>
+
+</body>
+</html>
