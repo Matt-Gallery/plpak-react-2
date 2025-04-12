@@ -1,463 +1,481 @@
-// Emre's project presentation notes
-// - Do not use alerts()! 
-// - Is there a win/lose state? 
-// - Leave comments in your code! 
-/*-------------------------------- Constants --------------------------------*/
-const deck = [
-  { value: "7", suit: "♥" },
-  { value: "8", suit: "♥" },
-  { value: "9", suit: "♥" },
-  { value: "10", suit: "♥" },
-  { value: "J", suit: "♥" },
-  { value: "Q", suit: "♥" },
-  { value: "K", suit: "♥" },
-  { value: "A", suit: "♥" },
-  { value: "7", suit: "♦" },
-  { value: "8", suit: "♦" },
-  { value: "9", suit: "♦" },
-  { value: "10", suit: "♦" },
-  { value: "J", suit: "♦" },
-  { value: "Q", suit: "♦" },
-  { value: "K", suit: "♦" },
-  { value: "A", suit: "♦" },
-  { value: "7", suit: "♣" },
-  { value: "8", suit: "♣" },
-  { value: "9", suit: "♣" },
-  { value: "10", suit: "♣" },
-  { value: "J", suit: "♣" },
-  { value: "Q", suit: "♣" },
-  { value: "K", suit: "♣" },
-  { value: "A", suit: "♣" },
-  { value: "7", suit: "♠" },
-  { value: "8", suit: "♠" },
-  { value: "9", suit: "♠" },
-  { value: "10", suit: "♠" },
-  { value: "J", suit: "♠" },
-  { value: "Q", suit: "♠" },
-  { value: "K", suit: "♠" },
-  { value: "A", suit: "♠" },
+// queens.js - ES6 Module Version for No Queens Round
+
+// --- Constants (Module-scoped) ---
+const deck_queens = [
+  { value: "7", suit: "♥" }, { value: "8", suit: "♥" }, { value: "9", suit: "♥" }, { value: "10", suit: "♥" }, { value: "J", suit: "♥" }, { value: "Q", suit: "♥" }, { value: "K", suit: "♥" }, { value: "A", suit: "♥" },
+  { value: "7", suit: "♦" }, { value: "8", suit: "♦" }, { value: "9", suit: "♦" }, { value: "10", suit: "♦" }, { value: "J", suit: "♦" }, { value: "Q", suit: "♦" }, { value: "K", suit: "♦" }, { value: "A", suit: "♦" },
+  { value: "7", suit: "♣" }, { value: "8", suit: "♣" }, { value: "9", suit: "♣" }, { value: "10", suit: "♣" }, { value: "J", suit: "♣" }, { value: "Q", suit: "♣" }, { value: "K", suit: "♣" }, { value: "A", suit: "♣" },
+  { value: "7", suit: "♠" }, { value: "8", suit: "♠" }, { value: "9", suit: "♠" }, { value: "10", suit: "♠" }, { value: "J", suit: "♠" }, { value: "Q", suit: "♠" }, { value: "K", suit: "♠" }, { value: "A", suit: "♠" },
 ];
+const cardStyle_queens = { "♥": "hearts", "♦": "diamonds", "♣": "clubs", "♠": "spades" };
+const cardRanks_queens = { 7: 1, 8: 2, 9: 3, 10: 4, J: 5, Q: 6, K: 7, A: 8 };
+const players_queens = ["player1", "player2", "player3", "player4"];
 
-const cardStyle = {
-  "♥": "hearts",
-  "♦": "diamonds",
-  "♣": "clubs",
-  "♠": "spades",
-};
-
-const winnerStyle = {
-  player1: "Player 1",
-  player2: "Player 2",
-  player3: "Player 3",
-  player4: "Player 4",
-};
-
-const cardRanks = { 7: 1, 8: 2, 9: 3, 10: 4, J: 5, Q: 6, K: 7, A: 8 };
-const players = ["player1", "player2", "player3", "player4"];
-
-/*---------------------------- Variables (state) ----------------------------*/
-// Could this be an object? :D 
-// const gameState = {
-//   playerHands: {},
-//   inPlay: [],
-//   score: [],
-//   ...etc
-// }
-let playerHands = { player1: [], player2: [], player3: [], player4: [] };
+// --- Module State (References to Controller State/Functions) ---
+let playerHands = {};
 let inPlay = [];
-let score = [0, 0, 0, 0];
-let currentStarter = "player2"; // Player 2 starts first round
-let gameOver = false; // Renamed from roundComplete
+let uiElements = {};
+let controllerUpdateState = () => {};
+let controllerUpdateScores = () => {}; // Keep for potential future use?
+let controllerShowNotification = () => {};
+let controllerDelay = () => {};
+let controllerActiveGameRef = {};
 
-/*------------------------ Cached Element References ------------------------*/
-const dealButtonEl = document.querySelector(".deal");
-const nextRoundButtonEl = document.querySelector(".next");
-const scoreboardEls = document.querySelectorAll(".score");
-const playAreas = {
-  player1: document.querySelector(".board .player1"),
-  player2: document.querySelector(".board .player2"),
-  player3: document.querySelector(".board .player3"),
-  player4: document.querySelector(".board .player4"),
-};
-const hands = {
-  player1: document.querySelector(".human"),
-  player2: document.querySelector(".hand-2"),
-  player3: document.querySelector(".tophand"),
-  player4: document.querySelector(".hand-4"),
-};
+// --- Module-Specific State ---
+let roundScore = [0, 0, 0, 0];
+let currentStarter = "player2";
+let roundOver = false;
+let isFirstTrick = true;
+let humanPlayerTurn = false;
+let humanCardSelectionResolver = null;
+let totalQueensPlayed = 0;
+let queensRoundStarted = false;
+let trickInProgress = false;
 
-/*-------------------------------- Functions --------------------------------*/
-
-// Shuffle and deal cards
-function dealCards() {
-  if (playerHands.player1.length !== 0) return;
-
-  // Clear the board and reset game state
-  clearBoard();
-  resetGameState();
-
-  for (let i = deck.length - 1; i >= 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
+// --- Initialization Function (Called by Controller via activeGame.init) ---
+function initRound() {
+  console.log("Queens.js: initRound called.");
+  if (queensRoundStarted) {
+      console.log("Queens.js: initRound called but already started.");
+      return; // Prevent re-init within same page load?
   }
+  queensRoundStarted = true;
+  roundOver = false;
+  isFirstTrick = true;
+  trickInProgress = false;
+  totalQueensPlayed = 0;
+  humanPlayerTurn = false;
+  humanCardSelectionResolver = null;
+  roundScore = [0, 0, 0, 0];
+  currentStarter = "player2"; // Confirm starting player rule for Queens round
+  controllerActiveGameRef.updateStarter(currentStarter);
 
+  // Deal cards
+  let shuffledDeck = [...deck_queens];
+  for (let i = shuffledDeck.length - 1; i >= 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
+  }
+  for (let player of players_queens) {
+       if (!playerHands[player]) playerHands[player] = [];
+       playerHands[player] = []; // Clear existing
+  }
   let cardIndex = 0;
-  while (cardIndex < deck.length) {
-    for (let player of players) {
-      if (cardIndex < deck.length && playerHands[player].length < 8) {
-        deck[cardIndex].player = player;
-        playerHands[player].push(deck[cardIndex]);
-        cardIndex++;
+  while (cardIndex < shuffledDeck.length) {
+      for (let player of players_queens) {
+          if (!playerHands[player]) playerHands[player] = [];
+          if (cardIndex < shuffledDeck.length && playerHands[player].length < 8) {
+              playerHands[player].push(shuffledDeck[cardIndex]);
+              cardIndex++;
+          }
       }
-    }
   }
 
   renderHands();
-
-  // Always start the round with Player 2
-  currentStarter = "player2";
-  startRound(currentStarter);
+  clearBoard();
+  controllerShowNotification(`Queens Round Started!`);
+  // Update controller state: round is ready, waiting for first "Next Trick"
+  controllerUpdateState({ gameStarted: true, roundOver: false, trickInProgress: false });
+  console.log("Queens.js: Round initialized and dealt. Waiting for 'Next Trick' click.");
 }
 
-// Function to clear the board of previously played cards
+// --- Game Logic Functions ---
+// Called by Controller via activeGame.startTrick
+async function startTrick(startingPlayer) {
+  console.log(`Queens.js: Starting trick, leader: ${startingPlayer}`);
+  if (roundOver || trickInProgress) {
+      console.warn(`Queens.js: startTrick called unexpectedly (roundOver=${roundOver}, trickInProgress=${trickInProgress})`);
+      controllerUpdateState({ trickInProgress: false, roundOver: roundOver });
+      return;
+  }
+
+  trickInProgress = true; // Mark trick as running *within this module*
+  inPlay = [];
+  players_queens.forEach((player) => {
+      if (uiElements.playAreas && uiElements.playAreas[player]) {
+          uiElements.playAreas[player].innerHTML = "";
+      } else { console.error(`UI element playAreas[${player}] not found!`); }
+  });
+  humanPlayerTurn = false;
+  let turnOrder = getNextPlayers(startingPlayer);
+  console.log(`Queens.js: Turn order: ${turnOrder.join(', ')}`);
+
+  try {
+      for (let i = 0; i < turnOrder.length; i++) {
+          let player = turnOrder[i];
+          console.log(`Queens.js: Current turn: ${player}`);
+          if (roundOver) {
+              console.log(`Queens.js: Round ended mid-trick (player ${player}'s turn).`);
+              break;
+          }
+          let leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
+          let playedCard = null;
+
+          if (player === "player1") {
+              humanPlayerTurn = true;
+              console.log("Queens.js: Waiting for human player...");
+              playedCard = await waitForPlayer1(leadSuit);
+              humanPlayerTurn = false; // Ensure this is set even if promise rejects? (Handled in finally)
+              if (!playedCard) throw new Error("Human player action failed.");
+              console.log(`Queens.js: Human played: ${playedCard.value}${playedCard.suit}`);
+          } else {
+              console.log(`Queens.js: AI ${player} thinking...`);
+              await controllerDelay(600);
+              // Pass currentStarter for AI context if needed by its logic
+              playedCard = selectCard_AI(player, leadSuit, startingPlayer);
+               if (!playedCard) throw new Error(`AI player ${player} failed to select a card.`);
+               console.log(`Queens.js: AI ${player} played: ${playedCard.value}${playedCard.suit}`);
+          }
+
+          // Assign player property and update state/UI
+          if (playedCard && typeof playedCard === 'object') {
+               playedCard.player = player;
+               inPlay.push(playedCard);
+               playCardToBoard(playedCard, player);
+           } else {
+               // Should not happen if errors are thrown above
+               throw new Error(`Invalid card obtained from player ${player}.`);
+           }
+      }
+
+      // --- Trick Resolution (only if loop completed) ---
+      console.log("Queens.js: Trick loop finished. Processing outcome...");
+      if (inPlay.length === 4 && !roundOver) { // Ensure exactly 4 cards and round didn't end prematurely
+          let trickWinner = determineTrickWinner(inPlay);
+          let points = determineTrickScore(inPlay); // Score based on Queens
+          let queensInTrick = inPlay.filter(c => c.value === 'Q').length;
+          totalQueensPlayed += queensInTrick;
+
+          if (trickWinner) {
+              let winnerIndex = players_queens.indexOf(trickWinner);
+              if (winnerIndex !== -1 && points > 0) {
+                  roundScore[winnerIndex] += points;
+                  console.log(`Queens.js: Trick winner: ${trickWinner}. Points: ${points}. Round Score: ${roundScore.join(',')}. Total Queens: ${totalQueensPlayed}`);
+              } else if (winnerIndex !== -1) {
+                   console.log(`Queens.js: Trick winner: ${trickWinner}. Points: 0.`);
+              } else {
+                   console.error(`Trick winner ${trickWinner} not found!`);
+              }
+          } else {
+               console.log("Queens.js: No trick winner determined.");
+          }
+
+          currentStarter = trickWinner || startingPlayer; // Winner leads next
+          controllerActiveGameRef.updateStarter(currentStarter);
+          roundOver = checkRoundOver(playerHands, totalQueensPlayed); // Check if round ends
+
+      } else if (roundOver) {
+           console.log("Queens.js: Trick processing skipped as round ended mid-trick.");
+      } else {
+           console.warn(`Queens.js: Trick ended with ${inPlay.length} cards. Not processing score.`);
+      }
+
+  } catch (error) {
+      console.error("Queens.js: Error during trick execution:", error);
+      roundOver = true; // Mark round over on error to prevent getting stuck
+  } finally {
+      // --- Signal Trick Completion ---
+      isFirstTrick = false; // Whether successful or not, first attempt is done
+      trickInProgress = false; // Mark trick as no longer running *within this module*
+
+      // Update controller: trick attempt is finished, send final state
+      console.log(`Queens.js: Trick attempt finished. Updating controller state (trickInProgress=false, roundOver=${roundOver}, currentRoundScore=${roundScore.join(',')})`);
+      // Send a copy of the score array to prevent mutation issues
+      controllerUpdateState({
+          trickInProgress: false,
+          roundOver: roundOver,
+          currentRoundScore: [...roundScore]
+      });
+  }
+}
+
+// --- UI Functions ---\
 function clearBoard() {
-  players.forEach((player) => {
-    playAreas[player].innerHTML = ""; // Removes any displayed cards from the board
+  players_queens.forEach((player) => {
+      if(uiElements.playAreas && uiElements.playAreas[player]) {
+          uiElements.playAreas[player].innerHTML = "";
+      } else { console.error(`UI element playAreas[${player}] not found during clearBoard!`); }
   });
-  inPlay = []; // Reset the in-play array
 }
 
-// Reset player hands and game over status
-function resetGameState() {
-  playerHands = { player1: [], player2: [], player3: [], player4: [] };
-  gameOver = false; // Use gameOver
-}
-
-// Render all players' hands and update UI
 function renderHands() {
-  players.forEach((player) => {
-    hands[player].innerHTML = "";
-    playerHands[player].forEach((card) => {
-      let cardHTML =
-        player === "player1"
-          ? `<div class="card ${cardStyle[card.suit]}" data-value="${
-              card.value
-            }" data-suit="${card.suit}"><span>${card.value}</span>${
-              card.suit
-            }</div>`
-          : `<img class="card back" src="static assets/playing card back.png" alt="Face Down Card" />`;
-      hands[player].insertAdjacentHTML("beforeend", cardHTML);
-    });
-  });
-
-  hands.player1.querySelectorAll(".card").forEach((card) => {
-    card.addEventListener("click", handleClick);
-  });
+   players_queens.forEach((player) => {
+       if (!uiElements.handsEls || !uiElements.handsEls[player]) {
+           console.error(`UI element handsEls[${player}] not found during renderHands!`);
+           return;
+       }
+       uiElements.handsEls[player].innerHTML = "";
+       if (playerHands[player] && Array.isArray(playerHands[player])) {
+           if (player === 'player1') {
+                playerHands[player].sort((a, b) => {
+                    if (a.suit < b.suit) return -1; if (a.suit > b.suit) return 1;
+                    return cardRanks_queens[a.value] - cardRanks_queens[b.value];
+                });
+            }
+           playerHands[player].forEach((card) => {
+               let cardHTML = player === "player1"
+                   ? `<div class="card ${cardStyle_queens[card.suit]}" data-value="${card.value}" data-suit="${card.suit}"><span>${card.value}</span>${card.suit}</div>`
+                   : `<img class="card back" src="static assets/playing card back.png" alt="Face Down Card" />`;
+               uiElements.handsEls[player].insertAdjacentHTML("beforeend", cardHTML);
+           });
+       } else { console.warn(`Player hand for ${player} is invalid during render.`); }
+   });
+   console.log("Queens.js: renderHands completed.");
+   // Listeners are attached only when needed in waitForPlayer1
 }
 
-// Get the next players' order
+function playCardToBoard(card, player) {
+  // Assumes card.player has been set before calling
+  if (!card || !card.player) {
+      console.error("playCardToBoard called with invalid card/player:", player, card);
+      return;
+  }
+   if (!playerHands[player]) {
+      console.error(`Player hand for ${player} does not exist.`);
+      return;
+  }
+  // Remove card from logical hand
+  const initialLength = playerHands[player].length;
+  playerHands[player] = playerHands[player].filter(c => !(c.value === card.value && c.suit === card.suit));
+  if (playerHands[player].length === initialLength) console.warn(`Card ${card.value}${card.suit} not found in ${player}'s hand.`);
+
+  // Update UI
+  if (player !== 'player1') {
+      if (uiElements.handsEls && uiElements.handsEls[player] && uiElements.handsEls[player].firstChild) {
+          uiElements.handsEls[player].removeChild(uiElements.handsEls[player].firstChild);
+      }
+  } else {
+      renderHands(); // Re-render human hand
+  }
+  if(uiElements.playAreas && uiElements.playAreas[player]) {
+      uiElements.playAreas[player].innerHTML = `<div class="card ${cardStyle_queens[card.suit]}">${card.value} ${card.suit}</div>`;
+  } else { console.error(`UI element playAreas[${player}] not found!`); }
+}
+
+// --- AI Logic ---
+// AI Strategy: Avoid taking Queens!
+function selectCard_AI(player, leadSuit, currentStarter) { // Added currentStarter
+  const playerCards = playerHands[player];
+  if (!playerCards || playerCards.length === 0) {
+      console.error(`AI ${player} has no cards.`);
+      return null;
+  }
+
+  const isLeading = !leadSuit;
+  const queensInHand = playerCards.filter((card) => card.value === "Q");
+  const hasLeadSuit = leadSuit ? playerCards.some((card) => card.suit === leadSuit) : false;
+  const cardsOfLeadSuit = leadSuit ? playerCards.filter((card) => card.suit === leadSuit) : [];
+  const nonQueensOfLeadSuit = cardsOfLeadSuit.filter(c => c.value !== 'Q');
+
+  // 1. Must follow suit if possible
+  if (leadSuit && hasLeadSuit) {
+      // If have non-Queens of lead suit, play the lowest safe one
+      if (nonQueensOfLeadSuit.length > 0) {
+           // Simple: Play lowest non-queen of lead suit
+           return nonQueensOfLeadSuit.reduce((lowest, card) => cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
+           // TODO: More advanced: Check if playing highest non-queen is safe (won't win if a Queen is out there?)
+      }
+      // If only have Queens of lead suit, must play one (play lowest rank Queen)
+      else { // cardsOfLeadSuit contains only Queens
+           return cardsOfLeadSuit.reduce((lowest, card) => cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
+      }
+  }
+
+  // 2. Cannot follow suit (or leading)
+  // A. Leading the trick
+  if (isLeading) {
+       // Try to lead with lowest non-Queen card
+       const nonQueens = playerCards.filter(c => c.value !== 'Q');
+       if (nonQueens.length > 0) {
+           return nonQueens.reduce((lowest, card) => cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
+       }
+       // If only Queens left, must lead with one (lowest)
+       return queensInHand.reduce((lowest, card) => cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
+  }
+  // B. Cannot follow suit, discarding
+  else {
+      // Discard highest Queen first (get rid of liability)
+      if (queensInHand.length > 0) {
+          return queensInHand.reduce((highest, card) => cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
+      }
+      // If no Queens, discard highest other card
+      return playerCards.reduce((highest, card) => cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
+  }
+}
+
+
+// --- Trick/Round Logic Utilities ---
 function getNextPlayers(startingPlayer) {
-  let order = ["player1", "player2", "player3", "player4"];
+  let order = [...players_queens];
   let startIndex = order.indexOf(startingPlayer);
+  if (startIndex === -1) {
+      console.warn(`Starting player ${startingPlayer} not found, defaulting.`);
+      startIndex = 0;
+  }
   return [...order.slice(startIndex), ...order.slice(0, startIndex)];
 }
 
-// Start the round
-// Utility delay function
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Updated startRound function
-async function startRound(startingPlayer) {
-  if (gameOver) return; // Check if game ended
-  inPlay = []; // Clear cards from previous trick
-  players.forEach((player) => (playAreas[player].innerHTML = "")); // Clear board visuals
-
-  let turnOrder = getNextPlayers(startingPlayer);
-
-  for (let i = 0; i < turnOrder.length; i++) {
-    let player = turnOrder[i];
-    if (gameOver) return; // Check again in case game ended mid-trick
-
-    if (player === "player1") {
-      await waitForPlayer1();
-    } else {
-      await delay(600); 
-      let playedCard = selectCard(player, inPlay[0]?.suit || null, currentStarter);
-      playCardToBoard(playedCard, player);
-    }
+function determineTrickWinner(trickCards) {
+  if (!trickCards || trickCards.length !== 4) {
+      console.error("determineTrickWinner: Invalid trickCards length");
+      return null;
   }
-
-  // After all 4 players have played...
-  if (inPlay.length === 4 && !gameOver) { // Ensure game didn't end on the last card
-    let winner = determineTrickWinner(); // This determines winner, calculates score, AND checks for game over (4 Queens)
-    currentStarter = winner; // Set starter for the *next* round
-    // determineTrickWinner will set gameOver if needed
-  }
-}
-
-// Play a card
-function playCardToBoard(card, player) {
-  if (!card) return;
-  playerHands[player] = playerHands[player].filter((c) => c !== card);
-  inPlay.push(card);
-
-  if (hands[player].firstChild) {
-    hands[player].removeChild(hands[player].firstChild);
-  }
-
-  playAreas[player].innerHTML = `<div class="card ${cardStyle[card.suit]}">${
-    card.value
-  } ${card.suit}</div>`;
-}
-
-// Updated selectCard function with provided logic
-function selectCard(player, leadSuit, currentStarter) {
-  const playerCards = playerHands[player];
-  
-  // Define helper variables based on the provided logic's needs
-  const isFourthPlayer = inPlay.length === 3;
-  const queensInHand = playerCards.filter((card) => card.value === "Q");
-  const hasLeadSuit = playerCards.some((card) => card.suit === leadSuit);
-  const cardsOfLeadSuit = playerCards.filter((card) => card.suit === leadSuit);
-  const inPlayLeadSuitCards = inPlay.filter((card) => card.suit === leadSuit);
-  const queenPlayedThisTrick = inPlay.some((card) => card.value === "Q");
-
-  // --- Start of provided logic --- 
-
-  // Rule 0: If starter is leading (no leadSuit), and has non-Queens, don't lead with a Queen
-  if (!leadSuit && player === currentStarter) {
-    const nonQueenCards = playerCards.filter((card) => card.value !== "Q");
-    if (nonQueenCards.length > 0) {
-      // Play the lowest non-queen card
-      return nonQueenCards.reduce((lowest, card) =>
-        cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-      );
-    }
-    // If only Queens are left, the starter must play one (handled by default logic later)
-  }
-
-  // Rule 1: Player doesn't have the lead suit & has a Queen => play a Queen
-  // (Modified slightly to handle multiple queens: plays the first one found)
-  if (leadSuit && !hasLeadSuit && queensInHand.length > 0) {
-     return queensInHand[0]; // Play the first Queen found
-  }
-
-  // Rule 2: Has Queen of lead suit and K or A of that suit has been played => play Queen
-  const hasQueenOfLeadSuit = playerCards.find(
-    (card) => card.value === "Q" && card.suit === leadSuit
-  );
-  const kingOrAcePlayed = inPlayLeadSuitCards.some(
-    (card) => card.value === "K" || card.value === "A"
-  );
-
-  if (hasQueenOfLeadSuit && kingOrAcePlayed) {
-    return hasQueenOfLeadSuit;
-  }
-
-  // Rule 3: 4th player, no queen played yet in trick, has lead suit => play highest of lead suit
-  if (isFourthPlayer && !queenPlayedThisTrick && cardsOfLeadSuit.length > 0) {
-    return cardsOfLeadSuit.reduce((highest, card) =>
-      cardRanks[card.value] > cardRanks[highest.value] ? card : highest
-    );
-  }
-
-  // Rule 4: Player must follow suit if they can
-  if (leadSuit && hasLeadSuit) {
-      // Default within following suit: play lowest card of lead suit
-      return cardsOfLeadSuit.reduce((lowest, card) =>
-        cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-      );
-  }
-  
-  // Rule 5: Cannot follow suit (and Rule 1 didn't apply/no Queens) => play highest card (dumping)
-  // This covers the case where leadSuit exists but player !hasLeadSuit and has no Queens.
-  if (leadSuit && !hasLeadSuit) { 
-      return playerCards.reduce((highest, card) =>
-          cardRanks[card.value] > cardRanks[highest.value] ? card : highest
-      );
-  }
-
-  // Default case (Should cover starting player having only Queens, or other edge cases)
-  // Play the lowest card in hand if no other rule applies
-  if (playerCards.length > 0) { // Ensure hand is not empty
-      return playerCards.reduce((lowest, card) =>
-        cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-      );
+  const leadSuit = trickCards[0].suit;
+  const cardsOfLeadSuit = trickCards.filter(card => card.suit === leadSuit);
+  let winningCard = null;
+  if (cardsOfLeadSuit.length > 0) {
+      winningCard = cardsOfLeadSuit.reduce((highest, card) => cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
   } else {
-      // Should not happen in normal play, but return null if hand is somehow empty
-      return null; 
+      winningCard = trickCards[0]; // First card wins if no one followed suit
+      console.warn(`Queens.js: No cards of lead suit ${leadSuit}. First card wins.`);
   }
-  // --- End of provided logic integration --- 
+  // Ensure player property exists
+  if (!winningCard || !winningCard.player) {
+       console.error("Winning card determined but has no player assigned!", winningCard);
+       // Try to find original card with player prop (less reliable fallback)
+       const originalCard = trickCards.find(c => c.value === winningCard.value && c.suit === winningCard.suit && c.player);
+       return originalCard ? originalCard.player : null;
+  }
+  return winningCard.player;
 }
 
-// Wait for Player 1 to pick a card
-function waitForPlayer1() {
-  return new Promise((resolve) => {
-    // Re-enable clicks only at the start of Player 1's turn
-    hands.player1.querySelectorAll(".card").forEach((card) => {
-      card.addEventListener("click", handleClick);
-    });
-    
-    function playerMoveHandler(event) {
-      const clickedCard = event.target.closest(".card");
-      if (!clickedCard) return; // Exit if no valid card is clicked
-      
-      const leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
-      
-      // Find the clicked card in player1's hand
-      let playedCardIndex = playerHands.player1.findIndex(
-        (card) =>
-          card.value === clickedCard.dataset.value &&
-          card.suit === clickedCard.dataset.suit
-      );
-      
-      if (playedCardIndex === -1) return; // If the card is not found, exit function
-      
-      let playedCard = playerHands.player1[playedCardIndex];
-      
-      // Check if Player 1 has a valid card of the leading suit
-      let validCards = playerHands.player1.filter((card) => card.suit === leadSuit);
-      
-      if (leadSuit && validCards.length > 0 && playedCard.suit !== leadSuit) {
-        // Show notification but don't resolve the promise
-        showNotification(`You must play a ${leadSuit} card!`);
-        return;
-      }
-      
-      // If we get here, a valid card was played
-      // Remove the played card from Player 1's hand array
-      playerHands.player1.splice(playedCardIndex, 1);
-      
-      // Play the selected card
-      playCardToBoard(playedCard, "player1");
-      
-      // Re-render the hand to reflect the removal
-      renderHands();
-      
-      // Disable further clicks until next round
-      hands.player1.querySelectorAll(".card").forEach((card) => {
-        card.removeEventListener("click", handleClick);
-      });
-      
-      // Remove the event listener and resolve the promise
-      hands.player1.removeEventListener("click", playerMoveHandler);
-      resolve();
+// Score 2 points for each Queen taken in the trick
+function determineTrickScore(trickCards) {
+  const queensCount = trickCards.filter(card => card.value === "Q").length;
+  return queensCount * 2;
+}
+
+// Round ends when hands are empty OR all 4 Queens have been played
+function checkRoundOver(currentHands, queensPlayedCount) {
+  const handsEmpty = players_queens.every((player) => !currentHands[player] || currentHands[player].length === 0);
+  if (handsEmpty) {
+      console.log("Queens.js: Hands empty. Round OVER.");
+      return true;
+  }
+  // Check based on total Queens captured during the round
+  if (queensPlayedCount >= 4) {
+      console.log(`Queens.js: ${queensPlayedCount} queens played. Round OVER.`);
+      return true;
+  }
+  return false;
+}
+
+// --- Human Interaction ---
+function attachHumanCardListeners() {
+  if (!uiElements.handsEls || !uiElements.handsEls.player1) {
+      console.error("Cannot attach listeners: Human hand UI element not found.");
+      return;
+  }
+  const cardElements = uiElements.handsEls.player1.querySelectorAll(".card");
+  cardElements.forEach((cardEl) => {
+      cardEl.removeEventListener("click", handleHumanClick); // Clean up old
+      cardEl.addEventListener("click", handleHumanClick);    // Add new
+  });
+}
+
+function removeHumanCardListeners() {
+   if (!uiElements.handsEls || !uiElements.handsEls.player1) return;
+   const cardElements = uiElements.handsEls.player1.querySelectorAll(".card");
+   cardElements.forEach((cardEl) => {
+      cardEl.removeEventListener("click", handleHumanClick);
+  });
+}
+
+function handleHumanClick(event) {
+  if (!humanPlayerTurn || !humanCardSelectionResolver) return;
+  const clickedCardEl = event.target.closest(".card");
+  if (!clickedCardEl) return;
+
+  const leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
+  const cardValue = clickedCardEl.dataset.value;
+  const cardSuit = clickedCardEl.dataset.suit;
+  const playedCard = playerHands.player1.find(card => card.value === cardValue && card.suit === cardSuit);
+
+  if (!playedCard) {
+      console.error(`Queens.js: Clicked card (${cardValue}${cardSuit}) not found!`);
+      return;
+  }
+
+  // Validation
+  const hasLeadSuitOnHand = playerHands.player1.some(card => card.suit === leadSuit);
+  if (leadSuit && hasLeadSuitOnHand && playedCard.suit !== leadSuit) {
+      controllerShowNotification(`You must play a ${leadSuit} card!`);
+      return; // Wait for valid play
+  }
+  // No other specific rules for human in Queens?
+
+  // Valid play
+  console.log(`Queens.js: Human selected: ${playedCard.value}${playedCard.suit}`);
+  humanPlayerTurn = false;
+  removeHumanCardListeners(); // Prevent further clicks immediately
+  if (uiElements.handsEls && uiElements.handsEls.player1) {
+      uiElements.handsEls.player1.classList.remove('active-turn');
+  }
+
+  // Resolve the promise AFTER UI updates
+  humanCardSelectionResolver(playedCard);
+  humanCardSelectionResolver = null; // Clear resolver
+}
+
+function waitForPlayer1(leadSuit) {
+  console.log(`Queens.js: Waiting for Player 1 (lead: ${leadSuit || 'None'})...`);
+  return new Promise((resolve, reject) => { // Add reject
+     // Clear any lingering resolver
+     if (humanCardSelectionResolver) {
+          console.warn("Queens.js: waitForPlayer1 resolver already active! Clearing.");
+          // Potentially reject the old promise if that makes sense?
+          // humanCardSelectionResolver(null); // Or reject(new Error("New turn started"));
+     }
+    humanCardSelectionResolver = resolve;
+    attachHumanCardListeners(); // Ensure listeners are attached
+    if (uiElements.handsEls && uiElements.handsEls.player1) {
+      uiElements.handsEls.player1.classList.add('active-turn');
     }
-    
-    hands.player1.addEventListener("click", playerMoveHandler);
+    // Add a timeout?
+    // setTimeout(() => reject(new Error("Player 1 timed out")), 30000);
+
+  }).finally(() => {
+       console.log("Queens.js: Player 1 promise finished.");
+       // Ensure resolver is cleared
+       if (humanCardSelectionResolver) humanCardSelectionResolver = null;
+       // Ensure UI cleanup
+       if (uiElements.handsEls && uiElements.handsEls.player1) {
+          uiElements.handsEls.player1.classList.remove('active-turn');
+       }
+       removeHumanCardListeners(); // Ensure listeners are removed
   });
 }
 
-// Show a notification message
-function showNotification(message) {
-  const notificationsEl = document.querySelector(".notifications");
-  notificationsEl.innerHTML = `<div class="notification">${message}</div>`;
-  
-  // Clear the notification after 3 seconds
-  setTimeout(() => {
-    notificationsEl.innerHTML = "";
-  }, 3000);
-}
-
-// Handle Player 1 clicking a card - this function is now only used for adding event listeners
-function handleClick(event) {
-  // This function is now just a placeholder for the event listener
-  // The actual card playing logic is in the playerMoveHandler function in waitForPlayer1
-}
-
-// Determine the trick winner
-function determineTrickWinner() {
-  const leadingSuit = inPlay[0].suit;
-  let winningCard = inPlay
-    .filter((card) => card.suit === leadingSuit)
-    .reduce((max, card) =>
-      cardRanks[card.value] > cardRanks[max.value] ? card : max
-    );
-  let winner = winningCard.player;
-
-  const queensCount = inPlay.filter(card => card.value === "Q").length;
-  score[players.indexOf(winner)] += queensCount * 2;
-  updateScores();
-
-  // Check if all Queens have been played
-  const totalQueensPlayed = deck.reduce((count, card) => {
-      if (card.value === 'Q') {
-          const isStillInHand = players.some(player =>
-              playerHands[player].some(handCard => handCard.value === 'Q' && handCard.suit === card.suit)
-          );
-          const isInCurrentTrick = inPlay.some(playedCard => playedCard.value === 'Q' && playedCard.suit === card.suit);
-          if (!isStillInHand || isInCurrentTrick) {
-              return count + 1;
-          }
-      }
-      return count;
-  }, 0);
-
-  if (totalQueensPlayed === 4) {
-    gameOver = true; // Set game over flag
-    dealButtonEl.disabled = false; 
-    nextRoundButtonEl.disabled = true; 
-    document.querySelector(".tophand").innerHTML = '<div class="end-message">All queens have been played! Game Over.</div>';
-     setTimeout(() => {
-        clearBoard();
-        resetGameState(); // This will set gameOver back to false for a new game
-        clearHands(); 
-      }, 3000); 
-    showNotification("All Queens played! Deal a new game.");
+// --- Registration Function (Exported) ---
+export function register(controllerGameObj, sharedState) {
+  console.log("Queens.js: Registering with controller.");
+  if (!sharedState) {
+       console.error("Queens.js: Invalid sharedState provided.");
+       return;
   }
+  // Store references
+  playerHands = sharedState.playerHands;
+  inPlay = sharedState.inPlay;
+  uiElements = sharedState.uiElements;
+  controllerUpdateState = sharedState.updateGameState;
+  controllerUpdateScores = sharedState.updateTotalScores; // Check if needed
+  controllerShowNotification = sharedState.showNotification;
+  controllerDelay = sharedState.delay;
+  controllerActiveGameRef = controllerGameObj;
 
-  return winner; // Return the winner of the trick
+  // Populate the controller's activeGame object
+  controllerGameObj.name = 'queens';
+  controllerGameObj.init = initRound;
+  controllerGameObj.startTrick = startTrick;
+
+  console.log("Queens.js module registered successfully.");
+  // Reset internal state on registration
+  queensRoundStarted = false;
+  roundOver = false;
+  isFirstTrick = true;
+  trickInProgress = false;
+  totalQueensPlayed = 0;
+  roundScore = [0, 0, 0, 0];
 }
 
-// Update scores
-function updateScores() {
-  scoreboardEls.forEach((el, i) => (el.textContent = `${score[i]}`));
-}
-
-// Event Listeners
-dealButtonEl.addEventListener("click", dealCards);
-
-nextRoundButtonEl.addEventListener("click", () => {
-  // 1. Check if the previous trick actually finished
-  if (inPlay.length < 4) {
-    showNotification("All players must play a card before proceeding...");
-    return;
-  }
-
-  // 2. Check if the game is *already* marked as over (all Queens played)
-  if (gameOver) {
-    showNotification("Game is over. Please Deal a new game.");
-    return;
-  }
-
-  // 3. Check if hands are empty (alternative round end condition)
-  // This condition signifies the end of the dealt hand if not all Queens were captured.
-  if (players.every((player) => playerHands[player].length === 0)) {
-      // The game over message due to Queens takes precedence if gameOver is already true.
-      let minScore = Math.min(...score);
-      let winners = players.filter((_, index) => score[index] === minScore);
-      let translatedWinners = winners.map((winner) => winnerStyle[winner]);
-      let message = translatedWinners.length > 1
-          ? `Hand End! Tie between ${translatedWinners.join(" and ")} with ${minScore} points!`
-          : `Hand End! ${translatedWinners[0]} wins with ${minScore} points!`;
-
-      document.querySelector(".tophand").innerHTML = `<div class="winner-message">${message}</div>`;
-      dealButtonEl.disabled = false;
-      nextRoundButtonEl.disabled = true;
-      showNotification("Hand ended (no cards left). Deal a new game.");
-      gameOver = true; // Mark game as over since the hand ended
-      return; // Prevent starting a new round
-  }
-
-  // 4. If trick finished, game not over by Queens, and hands not empty, start the next round
-  startRound(currentStarter);
-});
-
-// Utility function to clear hands visually (optional enhancement)
-function clearHands() {
-  players.forEach((player) => {
-    hands[player].innerHTML = "";
-  });
-}
+console.log("Queens.js module loaded.");

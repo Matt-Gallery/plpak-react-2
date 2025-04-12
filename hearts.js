@@ -1,454 +1,538 @@
-// Emre's project presentation notes
-// - Do not use alerts()! 
-// - Is there a win/lose state? 
-// - Leave comments in your code! 
-/*-------------------------------- Constants --------------------------------*/
-const deck = [
-  { value: "7", suit: "♥" },
-  { value: "8", suit: "♥" },
-  { value: "9", suit: "♥" },
-  { value: "10", suit: "♥" },
-  { value: "J", suit: "♥" },
-  { value: "Q", suit: "♥" },
-  { value: "K", suit: "♥" },
-  { value: "A", suit: "♥" },
-  { value: "7", suit: "♦" },
-  { value: "8", suit: "♦" },
-  { value: "9", suit: "♦" },
-  { value: "10", suit: "♦" },
-  { value: "J", suit: "♦" },
-  { value: "Q", suit: "♦" },
-  { value: "K", suit: "♦" },
-  { value: "A", suit: "♦" },
-  { value: "7", suit: "♣" },
-  { value: "8", suit: "♣" },
-  { value: "9", suit: "♣" },
-  { value: "10", suit: "♣" },
-  { value: "J", suit: "♣" },
-  { value: "Q", suit: "♣" },
-  { value: "K", suit: "♣" },
-  { value: "A", suit: "♣" },
-  { value: "7", suit: "♠" },
-  { value: "8", suit: "♠" },
-  { value: "9", suit: "♠" },
-  { value: "10", suit: "♠" },
-  { value: "J", suit: "♠" },
-  { value: "Q", suit: "♠" },
-  { value: "K", suit: "♠" },
-  { value: "A", suit: "♠" },
+// hearts.js - ES6 Module Version for No Hearts Round
+
+// --- Constants (Module-scoped) ---
+const deck_hearts = [
+    { value: "7", suit: "♥" }, { value: "8", suit: "♥" }, { value: "9", suit: "♥" }, { value: "10", suit: "♥" }, { value: "J", suit: "♥" }, { value: "Q", suit: "♥" }, { value: "K", suit: "♥" }, { value: "A", suit: "♥" },
+    { value: "7", suit: "♦" }, { value: "8", suit: "♦" }, { value: "9", suit: "♦" }, { value: "10", suit: "♦" }, { value: "J", suit: "♦" }, { value: "Q", suit: "♦" }, { value: "K", suit: "♦" }, { value: "A", suit: "♦" },
+    { value: "7", suit: "♣" }, { value: "8", suit: "♣" }, { value: "9", suit: "♣" }, { value: "10", suit: "♣" }, { value: "J", suit: "♣" }, { value: "Q", suit: "♣" }, { value: "K", suit: "♣" }, { value: "A", suit: "♣" },
+    { value: "7", suit: "♠" }, { value: "8", suit: "♠" }, { value: "9", suit: "♠" }, { value: "10", suit: "♠" }, { value: "J", suit: "♠" }, { value: "Q", suit: "♠" }, { value: "K", suit: "♠" }, { value: "A", suit: "♠" },
 ];
+const cardStyle_hearts = { "♥": "hearts", "♦": "diamonds", "♣": "clubs", "♠": "spades" };
+const cardRanks_hearts = { 7: 1, 8: 2, 9: 3, 10: 4, J: 5, Q: 6, K: 7, A: 8 };
+const players_hearts = ["player1", "player2", "player3", "player4"];
 
-const cardStyle = {
-  "♥": "hearts",
-  "♦": "diamonds",
-  "♣": "clubs",
-  "♠": "spades",
-};
+// --- Module State (References to Controller State/Functions) ---
+let playerHands = {}; // Reference to controller state
+let inPlay = [];      // Reference to controller state
+let uiElements = {};  // Reference to controller UI elements (playAreas, handsEls, notificationsEl, scoreboardEls)
+let controllerUpdateState = () => {};
+let controllerUpdateScores = () => {};
+let controllerShowNotification = () => {};
+let controllerDelay = () => {};
+let controllerActiveGameRef = {}; // Reference to controller's activeGame object
 
-const winnerStyle = {
-  player1: "Player 1",
-  player2: "Player 2",
-  player3: "Player 3",
-  player4: "Player 4",
-};
+// --- Module-Specific State ---
+let roundScore = [0, 0, 0, 0];
+let currentStarter = "player2";
+let roundOver = false;
+let isFirstTrick = true;
+let humanPlayerTurn = false;
+let humanCardSelectionResolver = null;
+let totalHeartsPlayed = 0;
+let heartsRoundStarted = false;
+let trickInProgress = false; // Track if a trick async operation is running
 
-const cardRanks = { 7: 1, 8: 2, 9: 3, 10: 4, J: 5, Q: 6, K: 7, A: 8 };
-const players = ["player1", "player2", "player3", "player4"];
-
-/*---------------------------- Variables (state) ----------------------------*/
-// Could this be an object? :D 
-// const gameState = {
-//   playerHands: {},
-//   inPlay: [],
-//   score: [],
-//   ...etc
-// }
-let playerHands = { player1: [], player2: [], player3: [], player4: [] };
-let inPlay = [];
-let score = [0, 0, 0, 0];
-let currentStarter = "player2"; // Player 2 starts first round
-let roundComplete = false;
-let heartsPlayed = 0; // Track the total number of hearts played
-
-/*------------------------ Cached Element References ------------------------*/
-const dealButtonEl = document.querySelector(".deal");
-const nextRoundButtonEl = document.querySelector(".next");
-const scoreboardEls = document.querySelectorAll(".score");
-const playAreas = {
-  player1: document.querySelector(".board .player1"),
-  player2: document.querySelector(".board .player2"),
-  player3: document.querySelector(".board .player3"),
-  player4: document.querySelector(".board .player4"),
-};
-const hands = {
-  player1: document.querySelector(".human"),
-  player2: document.querySelector(".hand-2"),
-  player3: document.querySelector(".tophand"),
-  player4: document.querySelector(".hand-4"),
-};
-
-/*-------------------------------- Functions --------------------------------*/
-
-// Shuffle and deal cards
-function dealCards() {
-  if (playerHands.player1.length !== 0) return;
-
-  // Clear the board and reset game state
-  clearBoard();
-  resetGameState();
-
-  for (let i = deck.length - 1; i >= 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-
-  let cardIndex = 0;
-  while (cardIndex < deck.length) {
-    for (let player of players) {
-      if (cardIndex < deck.length && playerHands[player].length < 8) {
-        deck[cardIndex].player = player;
-        playerHands[player].push(deck[cardIndex]);
-        cardIndex++;
-      }
+// --- Initialization Function (Called by Controller via activeGame.init) ---
+function initRound() {
+    console.log("Hearts.js: initRound called.");
+    if (heartsRoundStarted) {
+        console.log("Hearts.js: initRound called but already started. Resetting...");
+        // Allow re-initialization if called again?
     }
-  }
+    heartsRoundStarted = true;
+    roundOver = false;
+    isFirstTrick = true;
+    trickInProgress = false; // Ensure trick is not marked in progress initially
+    totalHeartsPlayed = 0;
+    humanPlayerTurn = false;
+    humanCardSelectionResolver = null;
+    roundScore = [0, 0, 0, 0]; // Reset round-specific score
+    currentStarter = "player2"; // Confirm rule: Does Hearts round always start with P2?
+    controllerActiveGameRef.updateStarter(currentStarter);
 
-  renderHands();
-
-  // Always start the round with Player 2
-  currentStarter = "player2";
-  startRound(currentStarter);
-}
-
-// Function to clear the board of previously played cards
-function clearBoard() {
-  players.forEach((player) => {
-    playAreas[player].innerHTML = ""; // Removes any displayed cards from the board
-  });
-  inPlay = []; // Reset the in-play array
-}
-
-// Reset player hands and round completion status
-function resetGameState() {
-  playerHands = { player1: [], player2: [], player3: [], player4: [] };
-  roundComplete = false;
-  heartsPlayed = 0; // Reset the hearts played counter
-}
-
-// Render all players' hands and update UI
-function renderHands() {
-  players.forEach((player) => {
-    hands[player].innerHTML = "";
-    playerHands[player].forEach((card) => {
-      let cardHTML =
-        player === "player1"
-          ? `<div class="card ${cardStyle[card.suit]}" data-value="${
-              card.value
-            }" data-suit="${card.suit}"><span>${card.value}</span>${
-              card.suit
-            }</div>`
-          : `<img class="card back" src="static assets/playing card back.png" alt="Face Down Card" />`;
-      hands[player].insertAdjacentHTML("beforeend", cardHTML);
-    });
-  });
-
-  hands.player1.querySelectorAll(".card").forEach((card) => {
-    card.addEventListener("click", handleClick);
-  });
-}
-
-// Get the next players' order
-function getNextPlayers(startingPlayer) {
-  let order = ["player1", "player2", "player3", "player4"];
-  let startIndex = order.indexOf(startingPlayer);
-  return [...order.slice(startIndex), ...order.slice(0, startIndex)];
-}
-
-// Start the round
-// Utility delay function
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Updated startRound function to include delay for computer players
-async function startRound(startingPlayer) {
-  if (roundComplete) return;
-  inPlay = [];
-  players.forEach((player) => (playAreas[player].innerHTML = ""));
-
-  let turnOrder = getNextPlayers(startingPlayer);
-
-  for (let i = 0; i < turnOrder.length; i++) {
-    let player = turnOrder[i];
-
-    if (player === "player1") {
-      await waitForPlayer1();
-    } else {
-      await delay(600); // Await a 400ms delay before computer plays
-      let playedCard = selectCard(player, inPlay[0]?.suit || null);
-      playCardToBoard(playedCard, player);
+    // Deal cards (using shared playerHands reference)
+    let shuffledDeck = [...deck_hearts];
+    for (let i = shuffledDeck.length - 1; i >= 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
     }
-  }
+    // Clear hands before dealing (accessing shared state)
+    for (let player of players_hearts) {
+         if (playerHands[player]) {
+            playerHands[player] = [];
+         } else {
+            console.error(`initRound: playerHands[${player}] is undefined before clearing.`);
+            playerHands[player] = []; // Initialize if missing
+         }
+    }
+    let cardIndex = 0;
+    while (cardIndex < shuffledDeck.length) {
+        for (let player of players_hearts) {
+            if (!playerHands[player]) playerHands[player] = []; // Ensure initialized
+            if (cardIndex < shuffledDeck.length && playerHands[player].length < 8) {
+                playerHands[player].push(shuffledDeck[cardIndex]);
+                cardIndex++;
+            }
+        }
+    }
 
-  if (inPlay.length === 4) {
-    roundComplete = true;
-    let winner = determineTrickWinner();
-    currentStarter = winner;
-  }
+    renderHands(); // Update UI based on new playerHands state
+    clearBoard();  // Clear visual board
+    controllerShowNotification(`Hearts Round Started!`);
+
+    // Update controller state AFTER dealing and BEFORE starting the first trick
+    // Mark game as started, round not over, and trick not yet in progress
+    controllerUpdateState({ gameStarted: true, roundOver: false, trickInProgress: false });
+
+    // --- Do NOT automatically start the first trick here anymore ---
+    // The user should click "Next Trick" to start the first trick
+    // startTrick(currentStarter);
+    console.log("Hearts.js: Round initialized and dealt. Waiting for 'Next Trick' click.");
 }
 
-// Play a card
-function playCardToBoard(card, player) {
-  if (!card) return;
-  playerHands[player] = playerHands[player].filter((c) => c !== card);
-  inPlay.push(card);
-
-  if (hands[player].firstChild) {
-    hands[player].removeChild(hands[player].firstChild);
-  }
-
-  playAreas[player].innerHTML = `<div class="card ${cardStyle[card.suit]}">${
-    card.value
-  } ${card.suit}</div>`;
-}
-
-// Updated selectCard function with new logic
-function selectCard(player, leadSuit) {
-  const playerCards = playerHands[player];
-  const cardsOfLeadSuit = playerCards.filter(card => card.suit === leadSuit);
-  
-  // New strategy logic
-  // 1. If first player (no lead suit)
-  if (!leadSuit) {
-    const lowHearts = playerCards.filter(card => 
-      card.suit === "♥" && (card.value === "7" || card.value === "8")
-    );
-    
-    if (lowHearts.length > 0 && Math.random() < 0.33) {
-      return lowHearts.reduce((lowest, card) => 
-        cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-      );
-    }
-  }
-  
-  // 2. If lead suit is hearts, try to play a lower heart
-  if (leadSuit === "♥" && cardsOfLeadSuit.length > 0) {
-    const heartsPlayed = inPlay.filter(card => card.suit === "♥");
-    if (heartsPlayed.length > 0) {
-      const highestHeartPlayed = heartsPlayed.reduce((highest, card) => 
-        cardRanks[card.value] > cardRanks[highest.value] ? card : highest
-      );
-      
-      const lowerHearts = cardsOfLeadSuit.filter(card => 
-        cardRanks[card.value] < cardRanks[highestHeartPlayed.value]
-      );
-      
-      if (lowerHearts.length > 0) {
-        return lowerHearts.reduce((highest, card) => 
-          cardRanks[card.value] > cardRanks[highest.value] ? card : highest
-        );
-      }
-    }
-  }
-  
-  // 3. If 4th player and no hearts played, try to win the trick
-  if (inPlay.length === 3 && !inPlay.some(card => card.suit === "♥")) {
-    if (cardsOfLeadSuit.length > 0) {
-      return cardsOfLeadSuit.reduce((highest, card) => 
-        cardRanks[card.value] > cardRanks[highest.value] ? card : highest
-      );
-    }
-  }
-  
-  // Default logic
-  if (!leadSuit) {
-    // Play lowest card of most common suit
-    const suitCounts = playerCards.reduce((acc, card) => {
-      acc[card.suit] = (acc[card.suit] || 0) + 1;
-      return acc;
-    }, {});
-    
-    const mostCommonSuit = Object.keys(suitCounts).reduce((a, b) =>
-      suitCounts[a] > suitCounts[b] ? a : b
-    );
-    
-    const cardsOfMostCommonSuit = playerCards.filter(card => card.suit === mostCommonSuit);
-    return cardsOfMostCommonSuit.reduce((lowest, card) =>
-      cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-    );
-  }
-  
-  if (cardsOfLeadSuit.length > 0) {
-    return cardsOfLeadSuit.reduce((lowest, card) =>
-      cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-    );
-  }
-  
-  // If no cards of lead suit, try to play highest heart
-  const hearts = playerCards.filter(card => card.suit === "♥");
-  if (hearts.length > 0) {
-    return hearts.reduce((highest, card) =>
-      cardRanks[card.value] > cardRanks[highest.value] ? card : highest
-    );
-  }
-  
-  // If no hearts, play highest card
-  return playerCards.reduce((highest, card) =>
-    cardRanks[card.value] > cardRanks[highest.value] ? card : highest
-  );
-}
-
-// Wait for Player 1 to pick a card
-function waitForPlayer1() {
-  return new Promise((resolve) => {
-    // Re-enable clicks only at the start of Player 1's turn
-    hands.player1.querySelectorAll(".card").forEach((card) => {
-      card.addEventListener("click", handleClick);
-    });
-    
-    function playerMoveHandler(event) {
-      const clickedCard = event.target.closest(".card");
-      if (!clickedCard) return; // Exit if no valid card is clicked
-      
-      const leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
-      
-      // Find the clicked card in player1's hand
-      let playedCardIndex = playerHands.player1.findIndex(
-        (card) =>
-          card.value === clickedCard.dataset.value &&
-          card.suit === clickedCard.dataset.suit
-      );
-      
-      if (playedCardIndex === -1) return; // If the card is not found, exit function
-      
-      let playedCard = playerHands.player1[playedCardIndex];
-      
-      // Check if Player 1 has a valid card of the leading suit
-      let validCards = playerHands.player1.filter((card) => card.suit === leadSuit);
-      
-      if (leadSuit && validCards.length > 0 && playedCard.suit !== leadSuit) {
-        // Show notification but don't resolve the promise
-        showNotification(`You must play a ${leadSuit} card!`);
+// --- Game Logic Functions ---
+// Called by Controller via activeGame.startTrick when "Next Trick" is clicked
+async function startTrick(startingPlayer) {
+    console.log(`Hearts.js: Starting trick, leader: ${startingPlayer}`);
+    if (roundOver) {
+        console.log("Hearts.js: startTrick called but round is over.");
+        // Signal back just in case controller state desynced
+        controllerUpdateState({ trickInProgress: false, roundOver: true });
         return;
+    }
+     if (trickInProgress) {
+         console.warn("Hearts.js: startTrick called while another trick is already in progress!");
+         return; // Prevent overlapping tricks
+     }
+
+    trickInProgress = true; // Mark trick as started within the module
+    inPlay = []; // Clear cards from previous trick
+    players_hearts.forEach((player) => {
+        if (uiElements.playAreas && uiElements.playAreas[player]) {
+            uiElements.playAreas[player].innerHTML = "";
+        } else {
+            console.error(`UI element playAreas[${player}] not found during trick start!`);
+        }
+    });
+    humanPlayerTurn = false;
+
+    let turnOrder = getNextPlayers(startingPlayer);
+    console.log(`Hearts.js: Turn order: ${turnOrder.join(', ')}`);
+
+    try {
+        for (let i = 0; i < turnOrder.length; i++) {
+            let player = turnOrder[i];
+            console.log(`Hearts.js: Current turn: ${player}`);
+            if (roundOver) {
+                console.log(`Hearts.js: Round ended mid-trick (player ${player}'s turn).`);
+                break; // Exit loop if round ended due to score
+            }
+            let leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
+            let playedCard = null;
+
+            if (player === "player1") {
+                humanPlayerTurn = true;
+                console.log("Hearts.js: Waiting for human player...");
+                playedCard = await waitForPlayer1(leadSuit);
+                humanPlayerTurn = false;
+                if (!playedCard) {
+                    console.error("P1 failed to play (Hearts).waitForPlayer1 resolved without a card.");
+                    // This indicates a potential issue in waitForPlayer1 or handleHumanClick logic
+                    // For now, we have to stop the trick to avoid getting stuck.
+                     throw new Error("Human player action failed."); // Throw error to stop trick
+                }
+                console.log(`Hearts.js: Human played: ${playedCard.value}${playedCard.suit}`);
+            } else {
+                console.log(`Hearts.js: AI ${player} thinking...`);
+                await controllerDelay(600); // Use shared delay
+                playedCard = selectCard_AI(player, leadSuit);
+                 if (playedCard) {
+                     console.log(`Hearts.js: AI ${player} played: ${playedCard.value}${playedCard.suit}`);
+                 } else {
+                      console.error(`AI ${player} returned null card.`);
+                      // AI failed, stop the trick
+                      throw new Error(`AI player ${player} failed to select a card.`);
+                 }
+            }
+
+            // Add player property dynamically
+            // Ensure playedCard is an object before assigning
+            if (playedCard && typeof playedCard === 'object') {
+                 playedCard.player = player;
+                 inPlay.push(playedCard);    // Add to logical trick state
+                 playCardToBoard(playedCard, player); // Update UI and hand state
+             } else {
+                 console.error(`Invalid playedCard object received for player ${player}.`);
+                 throw new Error(`Invalid card from player ${player}.`);
+             }
+        }
+
+        // --- Trick Resolution (only if loop completed naturally) ---
+        console.log("Hearts.js: Trick loop finished. Processing outcome...");
+        if (inPlay.length === 4 && !roundOver) {
+            let trickWinner = determineTrickWinner(inPlay);
+            let points = determineTrickScore(inPlay); // Score based on hearts taken
+            totalHeartsPlayed += points;
+
+            if (trickWinner) {
+                let winnerIndex = players_hearts.indexOf(trickWinner);
+                if (winnerIndex !== -1) {
+                    roundScore[winnerIndex] += points;
+                    console.log(`Hearts.js: Trick winner: ${trickWinner}. Points: ${points}. Round Score: ${roundScore.join(',')}. Total Hearts: ${totalHeartsPlayed}`);
+                } else {
+                     console.error(`Trick winner ${trickWinner} not found in players array!`);
+                }
+            } else {
+                 console.log("Hearts.js: No trick winner determined."); // Could happen if determineTrickWinner fails
+            }
+
+            currentStarter = trickWinner || startingPlayer; // Winner starts next trick
+            controllerActiveGameRef.updateStarter(currentStarter);
+            roundOver = checkRoundOver(playerHands, totalHeartsPlayed); // Check if round ends
+
+        } else if (roundOver) {
+             console.log("Hearts.js: Trick processing skipped as round ended mid-trick.");
+        } else {
+            // This case (inPlay.length !== 4) should ideally not happen if loop completes
+            console.warn(`Hearts.js: Trick ended with ${inPlay.length} cards. Not processing score normally.`);
+        }
+
+    } catch (error) {
+        console.error("Hearts.js: Error during trick execution:", error);
+        // If an error occurred (like player failing to play), we might be in an inconsistent state.
+        // Mark the round as over to prevent getting stuck? Or maybe just mark trick failed?
+        // For now, let's just ensure we signal the trick attempt is over.
+        roundOver = true; // Mark round over to be safe if trick failed badly
+    } finally {
+        // --- Signal Trick Completion (Finally Block) ---
+        isFirstTrick = false;
+        trickInProgress = false;
+
+        // Update controller: trick is no longer in progress, update roundOver status,
+        // AND send the current accumulated round score for display.
+        console.log(`Hearts.js: Trick attempt finished. Updating controller state (trickInProgress=false, roundOver=${roundOver}, currentRoundScore=${roundScore.join(',')})`);
+        controllerUpdateState({ 
+            trickInProgress: false, 
+            roundOver: roundOver, 
+            currentRoundScore: roundScore // Send current round score
+        });
+    }
+}
+
+
+function clearBoard() {
+    players_hearts.forEach((player) => {
+        if(uiElements.playAreas && uiElements.playAreas[player]) {
+            uiElements.playAreas[player].innerHTML = "";
+        } else {
+             console.error(`UI element playAreas[${player}] not found during clearBoard!`);
+        }
+    });
+    // inPlay is reset in startTrick
+}
+
+function renderHands() {
+     players_hearts.forEach((player) => {
+         if (!uiElements.handsEls || !uiElements.handsEls[player]) {
+             console.error(`UI element handsEls[${player}] not found during renderHands!`);
+             return;
+         }
+         uiElements.handsEls[player].innerHTML = "";
+         if (playerHands[player] && Array.isArray(playerHands[player])) {
+             if (player === 'player1') {
+                  playerHands[player].sort((a, b) => {
+                      if (a.suit < b.suit) return -1; if (a.suit > b.suit) return 1;
+                      return cardRanks_hearts[a.value] - cardRanks_hearts[b.value];
+                  });
+              }
+             playerHands[player].forEach((card) => {
+                 let cardHTML = player === "player1"
+                     ? `<div class="card ${cardStyle_hearts[card.suit]}" data-value="${card.value}" data-suit="${card.suit}"><span>${card.value}</span>${card.suit}</div>`
+                     : `<img class="card back" src="static assets/playing card back.png" alt="Face Down Card" />`;
+                 uiElements.handsEls[player].insertAdjacentHTML("beforeend", cardHTML);
+             });
+         } else {
+              console.warn(`Player hand for ${player} is not ready or invalid during render.`);
+         }
+     });
+     // We only attach listeners when it becomes the human's turn inside waitForPlayer1
+     // attachHumanCardListeners();
+     console.log("Hearts.js: renderHands completed.");
+}
+
+function getNextPlayers(startingPlayer) {
+    let order = [...players_hearts];
+    let startIndex = order.indexOf(startingPlayer);
+    if (startIndex === -1) {
+        console.warn(`Starting player ${startingPlayer} not found, defaulting to index 0.`);
+        startIndex = 0;
+    }
+    return [...order.slice(startIndex), ...order.slice(0, startIndex)];
+}
+
+function playCardToBoard(card, player) {
+    // Assumes card.player has been set before calling
+    if (!card || !card.player) {
+        console.error("playCardToBoard called with invalid card/player for player:", player, card);
+        return;
+    }
+     if (!playerHands[player]) {
+        console.error(`playCardToBoard: Player hand for ${player} does not exist.`);
+        return;
+    }
+
+    // Remove card from logical hand state
+    const initialLength = playerHands[player].length;
+    playerHands[player] = playerHands[player].filter(c => !(c.value === card.value && c.suit === card.suit));
+    if (playerHands[player].length === initialLength) {
+         console.warn(`Card ${card.value}${card.suit} not found in ${player}'s hand during filter.`);
+    }
+
+    // Update UI
+    if (player !== 'player1') {
+        if (uiElements.handsEls && uiElements.handsEls[player] && uiElements.handsEls[player].firstChild) {
+            uiElements.handsEls[player].removeChild(uiElements.handsEls[player].firstChild);
+        }
+    } else {
+        // Re-render human hand to show remaining cards
+        // Listeners are handled by waitForPlayer1/handleHumanClick now
+        renderHands();
+    }
+    // Display the played card on the board
+    if(uiElements.playAreas && uiElements.playAreas[player]) {
+        uiElements.playAreas[player].innerHTML = `<div class="card ${cardStyle_hearts[card.suit]}">${card.value} ${card.suit}</div>`;
+    } else {
+         console.error(`UI element playAreas[${player}] not found! Cannot display played card.`);
+    }
+}
+
+// --- AI Logic ---
+function selectCard_AI(player, leadSuit) {
+    const playerCards = playerHands[player];
+    if (!playerCards || playerCards.length === 0) {
+        console.error(`AI ${player} has no cards to play.`);
+        return null;
+    }
+
+    const cardsOfLeadSuit = playerCards.filter(card => card.suit === leadSuit);
+    const heartsInHand = playerCards.filter(card => card.suit === '♥');
+    const nonHeartsInHand = playerCards.filter(card => card.suit !== '♥');
+
+    // 1. Must follow suit if possible
+    if (leadSuit && cardsOfLeadSuit.length > 0) {
+        // console.log(`AI ${player}: Following suit ${leadSuit}.`);
+        return cardsOfLeadSuit.reduce((lowest, card) =>
+            cardRanks_hearts[card.value] < cardRanks_hearts[lowest.value] ? card : lowest
+        );
+    }
+
+    // 2. Cannot follow suit (or no lead suit yet)
+    // console.log(`AI ${player}: Cannot follow suit ${leadSuit} or is leading.`);
+    if (!leadSuit) { // Leading the trick
+        if (nonHeartsInHand.length > 0) {
+            // console.log(`AI ${player}: Leading with lowest non-heart.`);
+            return nonHeartsInHand.reduce((lowest, card) =>
+                cardRanks_hearts[card.value] < cardRanks_hearts[lowest.value] ? card : lowest
+            );
+        } else {
+            // console.log(`AI ${player}: Leading with lowest heart (only hearts left).`);
+            return heartsInHand.reduce((lowest, card) =>
+                cardRanks_hearts[card.value] < cardRanks_hearts[lowest.value] ? card : lowest
+            );
+        }
+    } else { // Cannot follow suit, discarding
+        if (nonHeartsInHand.length > 0) {
+            // console.log(`AI ${player}: Discarding highest non-heart.`);
+            return nonHeartsInHand.reduce((highest, card) =>
+                cardRanks_hearts[card.value] > cardRanks_hearts[highest.value] ? card : highest
+            );
+        } else {
+            // console.log(`AI ${player}: Discarding highest heart (only hearts left).`);
+            return heartsInHand.reduce((highest, card) =>
+                cardRanks_hearts[card.value] > cardRanks_hearts[highest.value] ? card : highest
+            );
+        }
+    }
+}
+
+// --- Trick/Round Logic Utilities ---
+function determineTrickWinner(trickCards) {
+    if (!trickCards || trickCards.length !== 4) {
+         console.error(`determineTrickWinner called with invalid trickCards (length ${trickCards ? trickCards.length : 0}).`);
+         return null;
+    }
+
+    const leadSuit = trickCards[0].suit;
+    let winningCard = null;
+    const cardsOfLeadSuit = trickCards.filter(card => card.suit === leadSuit);
+
+    if (cardsOfLeadSuit.length > 0) {
+        winningCard = cardsOfLeadSuit.reduce((highest, card) => {
+            return cardRanks_hearts[card.value] > cardRanks_hearts[highest.value] ? card : highest;
+        });
+    } else {
+        winningCard = trickCards[0]; // First card wins if no one followed suit
+        console.warn(`Hearts.js: No cards of lead suit ${leadSuit} found in trick. First card wins.`);
+    }
+
+    if (!winningCard || !winningCard.player) {
+         console.error("Winning card determined but has no player assigned!", winningCard);
+         return null;
+    }
+    return winningCard.player;
+}
+
+function determineTrickScore(trickCards) {
+    return trickCards.filter(card => card.suit === '♥').length;
+}
+
+function checkRoundOver(currentHands, heartsPlayedCount) {
+    const handsEmpty = players_hearts.every((player) => !currentHands[player] || currentHands[player].length === 0);
+    if (handsEmpty) {
+        return true;
+    }
+    if (heartsPlayedCount >= 8) {
+        return true;
+    }
+    return false;
+}
+
+// --- Human Interaction ---
+ function attachHumanCardListeners() {
+    if (!uiElements.handsEls || !uiElements.handsEls.player1) {
+        console.error("Cannot attach listeners: Human hand UI element not found.");
+        return;
+    }
+    const cardElements = uiElements.handsEls.player1.querySelectorAll(".card");
+    cardElements.forEach((cardEl) => {
+        cardEl.removeEventListener("click", handleHumanClick); // Clean up old
+        cardEl.addEventListener("click", handleHumanClick);    // Add new
+    });
+     // console.log(`Hearts.js: Attached listeners to ${cardElements.length} human cards.`);
+}
+
+function removeHumanCardListeners() {
+     if (!uiElements.handsEls || !uiElements.handsEls.player1) return;
+     const cardElements = uiElements.handsEls.player1.querySelectorAll(".card");
+     cardElements.forEach((cardEl) => {
+        cardEl.removeEventListener("click", handleHumanClick);
+    });
+     // console.log(`Hearts.js: Removed listeners from ${cardElements.length} human cards.`);
+}
+
+function handleHumanClick(event) {
+    if (!humanPlayerTurn || !humanCardSelectionResolver) {
+        // console.log("Hearts.js: Ignoring click, not human turn or resolver not set.");
+        return;
+    }
+    const clickedCardEl = event.target.closest(".card");
+    if (!clickedCardEl) return;
+
+    const leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
+    const cardValue = clickedCardEl.dataset.value;
+    const cardSuit = clickedCardEl.dataset.suit;
+    const playedCard = playerHands.player1.find(card => card.value === cardValue && card.suit === cardSuit);
+
+    if (!playedCard) {
+        console.error(`Hearts.js: Clicked card (${cardValue}${cardSuit}) not found in logical hand!`);
+        return;
+    }
+
+    // Validation
+    const hasLeadSuitOnHand = playerHands.player1.some(card => card.suit === leadSuit);
+    if (leadSuit && hasLeadSuitOnHand && playedCard.suit !== leadSuit) {
+        controllerShowNotification(`You must play a ${leadSuit} card!`);
+        return; // Wait for valid play
+    }
+    if (isFirstTrick && inPlay.length === 0 && playedCard.suit === '♥') {
+         const onlyHasHearts = playerHands.player1.every(card => card.suit === '♥');
+         if (!onlyHasHearts) {
+            controllerShowNotification(`You cannot lead Hearts on the first trick!`);
+            return; // Wait for valid play
+         }
+    }
+
+    // Valid play
+    console.log(`Hearts.js: Human selected valid card: ${playedCard.value}${playedCard.suit}`);
+    humanPlayerTurn = false; // Mark turn as logically over
+    removeHumanCardListeners(); // Prevent further clicks
+    if (uiElements.handsEls && uiElements.handsEls.player1) {
+        uiElements.handsEls.player1.classList.remove('active-turn'); // Remove highlight
+    }
+
+    // IMPORTANT: Resolve the promise *after* UI updates/listener removal
+    humanCardSelectionResolver(playedCard);
+    humanCardSelectionResolver = null; // Clear resolver
+}
+
+
+function waitForPlayer1(leadSuit) {
+    console.log(`Hearts.js: Waiting for Player 1 input (lead: ${leadSuit || 'None'})...`);
+    return new Promise((resolve, reject) => { // Added reject
+      // Ensure previous resolver is cleared if any
+       if (humanCardSelectionResolver) {
+            console.warn("waitForPlayer1 called while a previous resolver was active. Clearing old.");
+            humanCardSelectionResolver = null; // Or potentially reject previous promise?
+       }
+
+      humanCardSelectionResolver = resolve; // Set the resolver for handleHumanClick
+      attachHumanCardListeners(); // Ensure listeners are active on current cards
+      if (uiElements.handsEls && uiElements.handsEls.player1) {
+        uiElements.handsEls.player1.classList.add('active-turn'); // Highlight human hand
       }
-      
-      // If we get here, a valid card was played
-      // Remove the played card from Player 1's hand array
-      playerHands.player1.splice(playedCardIndex, 1);
-      
-      // Play the selected card
-      playCardToBoard(playedCard, "player1");
-      
-      // Re-render the hand to reflect the removal
-      renderHands();
-      
-      // Disable further clicks until next round
-      hands.player1.querySelectorAll(".card").forEach((card) => {
-        card.removeEventListener("click", handleClick);
-      });
-      
-      // Remove the event listener and resolve the promise
-      hands.player1.removeEventListener("click", playerMoveHandler);
-      resolve();
+      // Potential TODO: Add a timeout mechanism? What if user never clicks?
+      // setTimeout(() => reject(new Error("Player 1 timed out")), 30000); // Example 30s timeout
+
+    }).finally(() => {
+         // Clean up happens within handleHumanClick upon valid selection
+         console.log("Hearts.js: Player 1 promise finished.");
+         // Ensure resolver is cleared if promise finished without a click (e.g., rejected by timeout)
+         if (humanCardSelectionResolver) {
+             humanCardSelectionResolver = null;
+         }
+         // Ensure highlight is removed
+         if (uiElements.handsEls && uiElements.handsEls.player1) {
+            uiElements.handsEls.player1.classList.remove('active-turn');
+         }
+         // Ensure listeners are removed if promise ends without click
+         removeHumanCardListeners();
+    });
+}
+
+
+// --- Registration Function (Exported) ---
+export function register(controllerGameObj, sharedState) {
+    console.log("Hearts.js: Registering with controller.");
+    if (!sharedState || typeof sharedState !== 'object') {
+         console.error("Hearts.js: Invalid sharedState received during registration.");
+         return;
     }
-    
-    hands.player1.addEventListener("click", playerMoveHandler);
-  });
+    // Store references
+    playerHands = sharedState.playerHands;
+    inPlay = sharedState.inPlay;
+    uiElements = sharedState.uiElements;
+    controllerUpdateState = sharedState.updateGameState;
+    controllerUpdateScores = sharedState.updateTotalScores;
+    controllerShowNotification = sharedState.showNotification;
+    controllerDelay = sharedState.delay;
+    controllerActiveGameRef = controllerGameObj;
+
+     // Verification (Optional)
+     // ... (checks omitted for brevity) ...
+
+    // Populate the controller's activeGame object
+    controllerGameObj.name = 'hearts';
+    controllerGameObj.init = initRound;     // Called by Deal button
+    controllerGameObj.startTrick = startTrick; // Called by Next Trick button
+
+    console.log("Hearts.js module registered successfully.");
+    // Reset internal module state flags upon registration
+    heartsRoundStarted = false;
+    roundOver = false;
+    isFirstTrick = true;
+    trickInProgress = false;
+    totalHeartsPlayed = 0;
+    roundScore = [0, 0, 0, 0];
 }
 
-// Show a notification message
-function showNotification(message) {
-  const notificationsEl = document.querySelector(".notifications");
-  notificationsEl.innerHTML = `<div class="notification">${message}</div>`;
-  
-  // Clear the notification after 3 seconds
-  setTimeout(() => {
-    notificationsEl.innerHTML = "";
-  }, 3000);
-}
-
-// Handle Player 1 clicking a card - this function is now only used for adding event listeners
-function handleClick(event) {
-  // This function is now just a placeholder for the event listener
-  // The actual card playing logic is in the playerMoveHandler function in waitForPlayer1
-}
-
-// Determine the trick winner
-function determineTrickWinner() {
-  const leadingSuit = inPlay[0].suit;
-  let winningCard = inPlay
-    .filter((card) => card.suit === leadingSuit)
-    .reduce((max, card) =>
-      cardRanks[card.value] > cardRanks[max.value] ? card : max
-    );
-  let winner = winningCard.player;
-  
-  // Count hearts in the trick
-  let heartsInTrick = inPlay.filter(card => card.suit === "♥").length;
-  
-  // Update the total hearts played
-  heartsPlayed += heartsInTrick;
-  
-  // Award points based on hearts taken (1 point per heart)
-  score[players.indexOf(winner)] += heartsInTrick;
-  
-  updateScores();
-  
-  // Check if the game should end (8 hearts played)
-  if (heartsPlayed >= 8) {
-    roundComplete = true;
-    dealButtonEl.disabled = false; // Enable the deal button
-    nextRoundButtonEl.disabled = false; // Enable the next round button
-    console.log("Game over! 8 hearts have been played.");
-    
-    // Display a simple message that all hearts have been played
-    document.querySelector(".tophand").innerHTML = `<div class="winner-message">All hearts have been played</div>`;
-    showNotification("Please deal next hand");
-  }
-  
-  return winner;
-}
-
-// Update scores
-function updateScores() {
-  scoreboardEls.forEach((el, i) => (el.textContent = `${score[i]}`));
-}
-
-// Event Listeners
-dealButtonEl.addEventListener("click", dealCards);
-nextRoundButtonEl.addEventListener("click", () => {
-  if (inPlay.length < 4) {
-    showNotification("All players must play a card before proceeding to the next round!");
-    return;
-  }
-
-  if (heartsPlayed >= 8) {
-    showNotification("Please deal next hand");
-    return;
-  }
-
-  function checkGameOver() {
-    if (players.every((player) => playerHands[player].length === 0)) {
-      let minScore = Math.min(...score);
-      let winners = players.filter((_, index) => score[index] === minScore);
-
-      let translatedWinners = winners.map((winner) => winnerStyle[winner]);
-
-      let message =
-        translatedWinners.length > 1
-          ? `It's a tie between ${translatedWinners.join(
-              " and "
-            )} with ${minScore} points!`
-          : `${translatedWinners[0]} wins with ${minScore} points!`;
-
-      document.querySelector(
-        ".tophand"
-      ).innerHTML = `<div class="winner-message">${message}</div>`;
-    }
-  }
-
-  checkGameOver();
-
-  roundComplete = false;
-  startRound(currentStarter);
-});
+console.log("Hearts.js module loaded.");

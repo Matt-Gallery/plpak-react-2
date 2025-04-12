@@ -1,393 +1,404 @@
-// Emre's project presentation notes
-// - Do not use alerts()! 
-// - Is there a win/lose state? 
-// - Leave comments in your code! 
-/*-------------------------------- Constants --------------------------------*/
-const deck = [
-    { value: "7", suit: "♥" },
-    { value: "8", suit: "♥" },
-    { value: "9", suit: "♥" },
-    { value: "10", suit: "♥" },
-    { value: "J", suit: "♥" },
-    { value: "Q", suit: "♥" },
-    { value: "K", suit: "♥" },
-    { value: "A", suit: "♥" },
-    { value: "7", suit: "♦" },
-    { value: "8", suit: "♦" },
-    { value: "9", suit: "♦" },
-    { value: "10", suit: "♦" },
-    { value: "J", suit: "♦" },
-    { value: "Q", suit: "♦" },
-    { value: "K", suit: "♦" },
-    { value: "A", suit: "♦" },
-    { value: "7", suit: "♣" },
-    { value: "8", suit: "♣" },
-    { value: "9", suit: "♣" },
-    { value: "10", suit: "♣" },
-    { value: "J", suit: "♣" },
-    { value: "Q", suit: "♣" },
-    { value: "K", suit: "♣" },
-    { value: "A", suit: "♣" },
-    { value: "7", suit: "♠" },
-    { value: "8", suit: "♠" },
-    { value: "9", suit: "♠" },
-    { value: "10", suit: "♠" },
-    { value: "J", suit: "♠" },
-    { value: "Q", suit: "♠" },
-    { value: "K", suit: "♠" },
-    { value: "A", suit: "♠" },
+// tricks.js - ES6 Module Version
+
+// --- Constants (Module-scoped) ---
+const deck_tricks = [
+    { value: "7", suit: "♥" }, { value: "8", suit: "♥" }, { value: "9", suit: "♥" }, { value: "10", suit: "♥" }, { value: "J", suit: "♥" }, { value: "Q", suit: "♥" }, { value: "K", suit: "♥" }, { value: "A", suit: "♥" },
+    { value: "7", suit: "♦" }, { value: "8", suit: "♦" }, { value: "9", suit: "♦" }, { value: "10", suit: "♦" }, { value: "J", suit: "♦" }, { value: "Q", suit: "♦" }, { value: "K", suit: "♦" }, { value: "A", suit: "♦" },
+    { value: "7", suit: "♣" }, { value: "8", suit: "♣" }, { value: "9", suit: "♣" }, { value: "10", suit: "♣" }, { value: "J", suit: "♣" }, { value: "Q", suit: "♣" }, { value: "K", suit: "♣" }, { value: "A", suit: "♣" },
+    { value: "7", suit: "♠" }, { value: "8", suit: "♠" }, { value: "9", suit: "♠" }, { value: "10", suit: "♠" }, { value: "J", suit: "♠" }, { value: "Q", suit: "♠" }, { value: "K", suit: "♠" }, { value: "A", suit: "♠" },
   ];
+  const cardStyle_tricks = { "♥": "hearts", "♦": "diamonds", "♣": "clubs", "♠": "spades" };
+  const cardRanks_tricks = { 7: 1, 8: 2, 9: 3, 10: 4, J: 5, Q: 6, K: 7, A: 8 };
+  const players_tricks = ["player1", "player2", "player3", "player4"];
   
-  const cardStyle = {
-    "♥": "hearts",
-    "♦": "diamonds",
-    "♣": "clubs",
-    "♠": "spades",
-  };
+  // --- Module State ---
+  let playerHands = {}; // Reference to controller state
+  let inPlay = [];      // Reference to controller state
+  let uiElements = {};  // Reference to controller UI elements
+  let controllerUpdateState = () => {};
+  let controllerUpdateScores = () => {}; // Kept for now, but likely unused if score updates via updateGameState
+  let controllerShowNotification = () => {};
+  let controllerDelay = () => {};
+  let controllerActiveGameRef = {}; // Reference to controller's activeGame object
   
-  const winnerStyle = {
-    player1: "Player 1",
-    player2: "Player 2",
-    player3: "Player 3",
-    player4: "Player 4",
-  };
+  let roundScore_tricks = [0, 0, 0, 0];
+  let currentStarter_tricks = "player2";
+  let roundOver_tricks = false;
+  let isFirstTrick_tricks = true;
+  let humanPlayerTurn_tricks = false;
+  let humanCardSelectionResolver_tricks = null;
+  let tricksRoundStarted = false;
+  let trickInProgress = false;
   
-  const cardRanks = { 7: 1, 8: 2, 9: 3, 10: 4, J: 5, Q: 6, K: 7, A: 8 };
-  const players = ["player1", "player2", "player3", "player4"];
-  
-  /*---------------------------- Variables (state) ----------------------------*/
-  // Could this be an object? :D 
-  // const gameState = {
-  //   playerHands: {},
-  //   inPlay: [],
-  //   score: [],
-  //   ...etc
-  // }
-  let playerHands = { player1: [], player2: [], player3: [], player4: [] };
-  let inPlay = [];
-  let score = [0, 0, 0, 0];
-  let currentStarter = "player2"; // Player 2 starts first round
-  let roundComplete = false;
-  
-  /*------------------------ Cached Element References ------------------------*/
-  const dealButtonEl = document.querySelector(".deal");
-  const nextRoundButtonEl = document.querySelector(".next");
-  const scoreboardEls = document.querySelectorAll(".score");
-  const playAreas = {
-    player1: document.querySelector(".board .player1"),
-    player2: document.querySelector(".board .player2"),
-    player3: document.querySelector(".board .player3"),
-    player4: document.querySelector(".board .player4"),
-  };
-  const hands = {
-    player1: document.querySelector(".human"),
-    player2: document.querySelector(".hand-2"),
-    player3: document.querySelector(".tophand"),
-    player4: document.querySelector(".hand-4"),
-  };
-  
-  /*-------------------------------- Functions --------------------------------*/
-  
-  // Shuffle and deal cards
-  function dealCards() {
-    if (playerHands.player1.length !== 0) return;
-  
-    // Clear the board and reset game state
-    clearBoard();
-    resetGameState();
-  
-    for (let i = deck.length - 1; i >= 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-  
-    let cardIndex = 0;
-    while (cardIndex < deck.length) {
-      for (let player of players) {
-        if (cardIndex < deck.length && playerHands[player].length < 8) {
-          deck[cardIndex].player = player;
-          playerHands[player].push(deck[cardIndex]);
-          cardIndex++;
-        }
+  // --- Initialization Function ---
+  function initTricksRound() {
+      console.log("Tricks.js: initTricksRound called.");
+      if (tricksRoundStarted) {
+          console.log("Tricks.js: Round already started.");
+          return;
       }
-    }
+      tricksRoundStarted = true;
+      roundOver_tricks = false;
+      trickInProgress = false;
+      isFirstTrick_tricks = true;
+      humanPlayerTurn_tricks = false;
+      humanCardSelectionResolver_tricks = null;
+      roundScore_tricks = [0, 0, 0, 0];
+      currentStarter_tricks = "player2";
+      controllerActiveGameRef.updateStarter(currentStarter_tricks);
   
-    renderHands();
+      // Deal cards
+      let shuffledDeck = [...deck_tricks];
+      for (let i = shuffledDeck.length - 1; i >= 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
+      }
+      // Clear hands before dealing
+      for (let player of players_tricks) {
+           if (!playerHands[player]) playerHands[player] = [];
+           playerHands[player] = [];
+      }
+      let cardIndex = 0;
+      while (cardIndex < shuffledDeck.length) {
+          for (let player of players_tricks) {
+               if (!playerHands[player]) playerHands[player] = [];
+              if (cardIndex < shuffledDeck.length && playerHands[player].length < 8) {
+                  playerHands[player].push(shuffledDeck[cardIndex]);
+                  cardIndex++;
+              }
+          }
+      }
   
-    // Always start the round with Player 2
-    currentStarter = "player2";
-    startRound(currentStarter);
+      renderHands_tricks();
+      clearBoard_tricks();
+      controllerShowNotification(`Tricks Round Started!`);
+  
+      // --- CHANGE: Auto-start logic ---
+      // Update controller state: round started AND first trick is starting NOW
+      console.log("Tricks.js: Round initialized, starting first trick automatically.");
+      controllerUpdateState({ gameStarted: true, roundOver: false, trickInProgress: true }); // <<< Set trickInProgress TRUE here
+  
+      // Start the first trick automatically
+      startTrick_tricks(currentStarter_tricks); // <<< UNCOMMENTED this line
   }
   
-  // Function to clear the board of previously played cards
-  function clearBoard() {
-    players.forEach((player) => {
-      playAreas[player].innerHTML = ""; // Removes any displayed cards from the board
-    });
-    inPlay = []; // Reset the in-play array
-  }
+  // --- Game Logic Functions (using shared state/UI refs) ---
+  async function startTrick_tricks(startingPlayer) {
+      console.log(`Tricks.js: Starting trick, leader: ${startingPlayer}`);
+      // Check only if round is over, controller handles trickInProgress check before calling
+      if (roundOver_tricks) {
+          console.warn(`Tricks.js: startTrick called but round is already over.`);
+          controllerUpdateState({ trickInProgress: false, roundOver: true }); // Ensure controller knows
+          return;
+      }
   
-  // Reset player hands and round completion status
-  function resetGameState() {
-    playerHands = { player1: [], player2: [], player3: [], player4: [] };
-    roundComplete = false;
-  }
-  
-  // Render all players' hands and update UI
-  function renderHands() {
-    players.forEach((player) => {
-      hands[player].innerHTML = "";
-      playerHands[player].forEach((card) => {
-        let cardHTML =
-          player === "player1"
-            ? `<div class="card ${cardStyle[card.suit]}" data-value="${
-                card.value
-              }" data-suit="${card.suit}"><span>${card.value}</span>${
-                card.suit
-              }</div>`
-            : `<img class="card back" src="static assets/playing card back.png" alt="Face Down Card" />`;
-        hands[player].insertAdjacentHTML("beforeend", cardHTML);
+      trickInProgress = true; // Mark trick as started
+      inPlay = []; // <<< CRUCIAL: Ensure inPlay is cleared HERE at the start of the trick
+      players_tricks.forEach((player) => {
+          if (uiElements.playAreas && uiElements.playAreas[player]) {
+              uiElements.playAreas[player].innerHTML = "";
+          } else { console.error(`Tricks.js UI element playAreas[${player}] missing!`); }
       });
-    });
+      humanPlayerTurn_tricks = false;
+      let turnOrder = getNextPlayers_tricks(startingPlayer);
+      console.log(`Tricks.js: Turn order: ${turnOrder.join(', ')}`);
   
-    hands.player1.querySelectorAll(".card").forEach((card) => {
-      card.addEventListener("click", handleClick);
-    });
+      try {
+          // --- Player Turn Loop ---
+          for (let i = 0; i < turnOrder.length; i++) {
+              let player = turnOrder[i];
+               console.log(`Tricks.js: Current turn: ${player}`);
+               if (roundOver_tricks) {
+                   console.log(`Tricks.js: Round ended mid-trick.`);
+                   break;
+               }
+              let leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
+              let playedCard = null;
+  
+               if (player === "player1") {
+                   humanPlayerTurn_tricks = true;
+                   playedCard = await waitForPlayer1_tricks(leadSuit);
+                   humanPlayerTurn_tricks = false; // Ensure reset after await
+                   if (!playedCard) throw new Error("Human player action failed.");
+               } else {
+                   await controllerDelay(600);
+                   playedCard = selectCard_Tricks_AI(player, leadSuit, startingPlayer, isFirstTrick_tricks);
+                   if (!playedCard) throw new Error(`AI player ${player} failed to select card.`);
+               }
+  
+               // Assign player AFTER getting card, before adding to inPlay/board
+               if (playedCard && typeof playedCard === 'object') {
+                   playedCard.player = player;
+                   inPlay.push(playedCard); // <<< Card pushed HERE (only 4 times total)
+                   playCardToBoard_tricks(playedCard, player);
+               } else {
+                   throw new Error(`Invalid card from player ${player}.`);
+               }
+          }
+          // --- End Player Turn Loop ---
+  
+          // --- Trick Resolution (only if loop completed naturally) ---
+          console.log("Tricks.js: Trick loop finished. Processing outcome...");
+          // Check length MUST be 4 if loop completed without break/error
+          if (inPlay.length === 4 && !roundOver_tricks) {
+              console.log("Tricks.js: Processing trick score..."); // Add log
+              let trickWinner = determineTrickWinner_tricks(inPlay);
+              let points = 1; // 1 point per trick in this round
+              if (trickWinner) {
+                   let winnerIndex = players_tricks.indexOf(trickWinner);
+                   if (winnerIndex !== -1) {
+                      roundScore_tricks[winnerIndex] += points;
+                      console.log(`Tricks.js Updated Round Score: ${roundScore_tricks.join(',')}`); // Log updated score
+                   } else { console.error(`Tricks.js: Winner ${trickWinner} not found.`); }
+              } else { console.log("Tricks.js: No trick winner determined."); }
+  
+              currentStarter_tricks = trickWinner || startingPlayer;
+              controllerActiveGameRef.updateStarter(currentStarter_tricks);
+              roundOver_tricks = checkRoundOver_tricks(playerHands);
+              // roundOver status sent in finally block
+  
+              if (roundOver_tricks) {
+                  console.log("Tricks.js: Round Over condition met after trick.");
+                  controllerShowNotification(`Tricks Round Over! Click Deal.`);
+              }
+          } else if (roundOver_tricks) {
+              // This case happens if checkRoundOver became true mid-loop (shouldn't for tricks?)
+              console.log("Tricks.js: Trick processing skipped as round ended mid-trick.");
+          } else if (inPlay.length !== 4) {
+               // This case happens if the loop broke or errored before 4 cards
+               console.warn(`Tricks.js: Trick ended with unexpected length ${inPlay.length}. Not processing score.`);
+          }
+          // --- End Trick Resolution ---
+  
+      } catch (error) {
+           console.error("Tricks.js: Error during trick execution:", error);
+           roundOver_tricks = true; // Mark round over on error to prevent getting stuck
+      } finally {
+          // --- Signal Trick Completion ---
+          isFirstTrick_tricks = false; // First trick attempt is definitely done
+          trickInProgress = false; // Mark trick as finished
+  
+          // Update controller with final state for this trick attempt
+          console.log(`Tricks.js: Trick attempt finished. Updating controller state (trickInProgress=false, roundOver=${roundOver_tricks}, currentRoundScore=${roundScore_tricks.join(',')})`);
+          controllerUpdateState({
+              trickInProgress: false,
+              roundOver: roundOver_tricks,
+              currentRoundScore: [...roundScore_tricks] // Send score copy
+          });
+          // --- End Signal Trick Completion ---
+      }
   }
   
-  // Get the next players' order
-  function getNextPlayers(startingPlayer) {
-    let order = ["player1", "player2", "player3", "player4"];
-    let startIndex = order.indexOf(startingPlayer);
-    return [...order.slice(startIndex), ...order.slice(0, startIndex)];
+  function checkRoundOver_tricks(currentHands) {
+       // Check if ALL player hands in the shared state are empty
+       const isEmpty = players_tricks.every((player) => !currentHands[player] || currentHands[player].length === 0);
+       if(isEmpty) console.log("Tricks.js: checkRoundOver - Hands empty. Round OVER.");
+      return isEmpty;
   }
   
-  // Start the round
-  // Utility delay function
-  function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  function clearBoard_tricks() {
+      players_tricks.forEach((player) => {
+          if (uiElements.playAreas && uiElements.playAreas[player]) {
+               uiElements.playAreas[player].innerHTML = "";
+          } else { console.error(`Tricks.js UI element playAreas[${player}] missing!`); }
+       });
   }
   
-  // Updated startRound function to include delay for computer players
-  async function startRound(startingPlayer) {
-    if (roundComplete) return;
-    inPlay = [];
-    players.forEach((player) => (playAreas[player].innerHTML = ""));
+  function renderHands_tricks() {
+      players_tricks.forEach((player) => {
+          if (!uiElements.handsEls || !uiElements.handsEls[player]) {
+               console.error(`Tricks.js UI element handsEls[${player}] not found!`);
+               return;
+           }
+          uiElements.handsEls[player].innerHTML = "";
+          // Ensure playerHands[player] is valid before proceeding
+          if (playerHands[player] && Array.isArray(playerHands[player])) {
+              if (player === 'player1') {
+                  playerHands[player].sort((a, b) => {
+                      if (a.suit < b.suit) return -1; if (a.suit > b.suit) return 1;
+                      return cardRanks_tricks[a.value] - cardRanks_tricks[b.value];
+                  });
+              }
+              playerHands[player].forEach((card) => {
+                  let cardHTML = player === "player1"
+                      ? `<div class="card ${cardStyle_tricks[card.suit]}" data-value="${card.value}" data-suit="${card.suit}"><span>${card.value}</span>${card.suit}</div>`
+                      : `<img class="card back" src="static assets/playing card back.png" alt="Face Down Card" />`;
+                  uiElements.handsEls[player].insertAdjacentHTML("beforeend", cardHTML);
+              });
+          } else { console.warn(`Tricks.js: Player hand for ${player} invalid during render.`); }
+      });
+      // Listeners attached by waitForPlayer1
+  }
   
-    let turnOrder = getNextPlayers(startingPlayer);
+  function playCardToBoard_tricks(card, player) {
+      if (!card || !card.player) {
+          console.error("playCardToBoard_tricks: Invalid card/player:", player, card);
+          return;
+      }
+      if (!playerHands[player]) { console.error(`Tricks.js: Hand for ${player} missing.`); return; }
   
-    for (let i = 0; i < turnOrder.length; i++) {
-      let player = turnOrder[i];
+      const initialLength = playerHands[player].length;
+      playerHands[player] = playerHands[player].filter(c => !(c.value === card.value && c.suit === card.suit));
+      if(initialLength === playerHands[player].length) console.warn(`Tricks.js: Card ${card.value}${card.suit} not found in ${player} hand.`);
   
-      if (player === "player1") {
-        await waitForPlayer1();
+      // Update visuals
+      if (player !== 'player1') {
+          if (uiElements.handsEls && uiElements.handsEls[player] && uiElements.handsEls[player].firstChild) {
+              uiElements.handsEls[player].removeChild(uiElements.handsEls[player].firstChild);
+          }
       } else {
-        await delay(600); // Await a 400ms delay before computer plays
-        let playedCard = selectCard(player, inPlay[0]?.suit || null);
-        playCardToBoard(playedCard, player);
+          renderHands_tricks(); // Re-render human hand
       }
-    }
-  
-    if (inPlay.length === 4) {
-      roundComplete = true;
-      let winner = determineTrickWinner();
-      currentStarter = winner;
-    }
+      if(uiElements.playAreas && uiElements.playAreas[player]){
+           uiElements.playAreas[player].innerHTML = `<div class="card ${cardStyle_tricks[card.suit]}">${card.value} ${card.suit}</div>`;
+       } else { console.error(`Tricks.js UI element playAreas[${player}] missing!`); }
   }
   
-  // Play a card
-  function playCardToBoard(card, player) {
-    if (!card) return;
-    playerHands[player] = playerHands[player].filter((c) => c !== card);
-    inPlay.push(card);
-  
-    if (hands[player].firstChild) {
-      hands[player].removeChild(hands[player].firstChild);
-    }
-  
-    playAreas[player].innerHTML = `<div class="card ${cardStyle[card.suit]}">${
-      card.value
-    } ${card.suit}</div>`;
-  }
-  
-  // Updated selectCard function with requested logic
-  function selectCard(player, leadSuit) {
-    const playerCards = playerHands[player];
-  
-    // Check if the computer is the first player in the round (no leadSuit)
-    if (!leadSuit) {
-      // Count occurrences of card values
-      const valueCounts = playerCards.reduce((acc, card) => {
-        acc[card.value] = (acc[card.value] || 0) + 1;
-        return acc;
-      }, {});
-  
-      // Find single card occurrences with rank < 11 (J or lower)
-      const singleLowCards = playerCards.filter(
-        (card) => valueCounts[card.value] === 1 && cardRanks[card.value] < 5 // ranks 7-10 (1-4)
-      );
-  
-      if (singleLowCards.length === 1) {
-        // Randomly decide between playing the single card or existing logic
-        const randomChoice = Math.random() < 0.5;
-        if (randomChoice) {
-          return singleLowCards[0];
-        } else {
-          // Existing logic: Play lowest card of the suit they have most of
-          const suitCounts = playerCards.reduce((acc, card) => {
-            acc[card.suit] = (acc[card.suit] || 0) + 1;
-            return acc;
-          }, {});
-  
-          const mostCommonSuit = Object.keys(suitCounts).reduce((a, b) =>
-            suitCounts[a] > suitCounts[b] ? a : b
-          );
-  
-          const cardsOfMostCommonSuit = playerCards.filter(
-            (card) => card.suit === mostCommonSuit
-          );
-  
-          return cardsOfMostCommonSuit.reduce((lowest, card) =>
-            cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-          );
-        }
+  function selectCard_Tricks_AI(player, leadSuit, starter, isFirstTrick) {
+       const playerCards = playerHands[player];
+      if (!playerCards || playerCards.length === 0) return null;
+      // Simple AI: Follow suit with lowest, otherwise play lowest overall
+      if (leadSuit) {
+           const cardsOfLeadSuit = playerCards.filter((card) => card.suit === leadSuit);
+           if (cardsOfLeadSuit.length > 0) {
+               return cardsOfLeadSuit.reduce((lowest, card) => cardRanks_tricks[card.value] < cardRanks_tricks[lowest.value] ? card : lowest);
+           }
       }
-    }
-  
-    // Existing logic for cases not meeting the special condition
-    let validCards = leadSuit
-      ? playerCards.filter((card) => card.suit === leadSuit)
-      : playerCards;
-  
-    return validCards.length > 0
-      ? validCards.reduce((lowest, card) =>
-          cardRanks[card.value] < cardRanks[lowest.value] ? card : lowest
-        )
-      : playerCards.reduce((highest, card) =>
-          cardRanks[card.value] > cardRanks[highest.value] ? card : highest
-        );
+       return playerCards.reduce((lowest, card) => cardRanks_tricks[card.value] < cardRanks_tricks[lowest.value] ? card : lowest);
   }
   
-  // Wait for Player 1 to pick a card
-  function waitForPlayer1() {
-    return new Promise((resolve) => {
-      function playerMoveHandler(event) {
-        handleClick(event);
-        hands.player1.removeEventListener("click", playerMoveHandler);
-        resolve();
+  function determineTrickWinner_tricks(trickCards) {
+       if (!trickCards || trickCards.length !== 4) {
+           console.error("determineTrickWinner_tricks: Invalid trickCards length");
+           return null;
+       }
+      const leadingSuit = trickCards[0].suit;
+      const cardsOfLeadSuit = trickCards.filter(card => card.suit === leadingSuit);
+      let winningCard = null;
+      if (cardsOfLeadSuit.length > 0) {
+          winningCard = cardsOfLeadSuit.reduce((highest, card) => cardRanks_tricks[card.value] > cardRanks_tricks[highest.value] ? card : highest);
+      } else {
+          winningCard = trickCards[0]; // First card wins if no one followed suit
+          console.warn(`Tricks.js: No cards of lead suit ${leadingSuit}. First card wins.`);
       }
-      hands.player1.addEventListener("click", playerMoveHandler);
-    });
-  }
-  
-  // Handle Player 1 clicking a card
-  function handleClick(event) {
-    const clickedCard = event.target.closest(".card"); // Ensure we get the card element
-    if (!clickedCard) return; // Exit if no valid card is clicked
-  
-    const leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
-  
-    // Find the clicked card in player1's hand
-    let playedCardIndex = playerHands.player1.findIndex(
-      (card) =>
-        card.value === clickedCard.dataset.value &&
-        card.suit === clickedCard.dataset.suit
-    );
-  
-    if (playedCardIndex === -1) return; // If the card is not found, exit function
-  
-    let playedCard = playerHands.player1[playedCardIndex];
-  
-    // Check if Player 1 has a valid card of the leading suit
-    let validCards = playerHands.player1.filter((card) => card.suit === leadSuit);
-  
-    if (leadSuit && validCards.length > 0 && playedCard.suit !== leadSuit) {
-      alert(`You must play a ${leadSuit} card!`);
-      return;
-    }
-  
-    // Remove the played card from Player 1's hand array
-    playerHands.player1.splice(playedCardIndex, 1);
-  
-    // Play the selected card
-    playCardToBoard(playedCard, "player1");
-  
-    // Re-render the hand to reflect the removal
-    renderHands();
-  
-    // Disable further clicks until next round
-    hands.player1.querySelectorAll(".card").forEach((card) => {
-      card.removeEventListener("click", handleClick);
-    });
-  }
-  
-  // Ensure clicks are enabled again when it's Player 1's turn
-  function waitForPlayer1() {
-    return new Promise((resolve) => {
-      function playerMoveHandler(event) {
-        handleClick(event);
-        hands.player1.removeEventListener("click", playerMoveHandler);
-        resolve();
+      if (!winningCard || !winningCard.player) {
+          console.error("Tricks.js: Winning card/player invalid!", winningCard);
+          // Fallback: try to find original card with player prop
+          const originalCard = trickCards.find(c => c.value === winningCard.value && c.suit === winningCard.suit && c.player);
+          return originalCard ? originalCard.player : null;
       }
+      return winningCard.player;
+  }
   
-      // Re-enable clicks only at the start of Player 1's turn
-      hands.player1.querySelectorAll(".card").forEach((card) => {
-        card.addEventListener("click", handleClick);
+  // --- Get Next Player ---
+  function getNextPlayers_tricks(startingPlayer) {
+      let order = [...players_tricks];
+      let startIndex = order.indexOf(startingPlayer);
+      if (startIndex === -1) {
+          console.warn(`Tricks.js: Starting player ${startingPlayer} not found, defaulting.`);
+          startIndex = 0;
+      }
+      return [...order.slice(startIndex), ...order.slice(0, startIndex)];
+  }
+  
+  // --- Human Interaction ---
+   function attachHumanCardListeners_tricks() {
+      if (!uiElements.handsEls || !uiElements.handsEls.player1) return;
+      const cardElements = uiElements.handsEls.player1.querySelectorAll(".card");
+      cardElements.forEach((cardEl) => {
+          cardEl.removeEventListener("click", handleHumanClick_tricks); // Clean up
+          cardEl.addEventListener("click", handleHumanClick_tricks);
       });
-  
-      hands.player1.addEventListener("click", playerMoveHandler);
-    });
   }
   
-  // Determine the trick winner
-  function determineTrickWinner() {
-    const leadingSuit = inPlay[0].suit;
-    let winningCard = inPlay
-      .filter((card) => card.suit === leadingSuit)
-      .reduce((max, card) =>
-        cardRanks[card.value] > cardRanks[max.value] ? card : max
-      );
-    let winner = winningCard.player;
-    score[players.indexOf(winner)]++;
-    updateScores();
-    return winner;
+  function removeHumanCardListeners_tricks() {
+       if (!uiElements.handsEls || !uiElements.handsEls.player1) return;
+       const cardElements = uiElements.handsEls.player1.querySelectorAll(".card");
+       cardElements.forEach((cardEl) => {
+          cardEl.removeEventListener("click", handleHumanClick_tricks);
+      });
   }
   
-  // Update scores
-  function updateScores() {
-    scoreboardEls.forEach((el, i) => (el.textContent = `${score[i]}`));
-  }
-  
-  // Event Listeners
-  dealButtonEl.addEventListener("click", dealCards);
-  nextRoundButtonEl.addEventListener("click", () => {
-    if (inPlay.length < 4) {
-      alert("All players must play a card before proceeding to the next round!");
-      return;
-    }
-  
-    function checkGameOver() {
-      if (players.every((player) => playerHands[player].length === 0)) {
-        let minScore = Math.min(...score);
-        let winners = players.filter((_, index) => score[index] === minScore);
-  
-        let translatedWinners = winners.map((winner) => winnerStyle[winner]);
-  
-        let message =
-          translatedWinners.length > 1
-            ? `It's a tie between ${translatedWinners.join(
-                " and "
-              )} with ${minScore} points!`
-            : `${translatedWinners[0]} wins with ${minScore} points!`;
-  
-        document.querySelector(
-          ".tophand"
-        ).innerHTML = `<div class="winner-message">${message}</div>`;
+  function handleHumanClick_tricks(event) {
+      if (!humanPlayerTurn_tricks || !humanCardSelectionResolver_tricks) return;
+      const clickedCardEl = event.target.closest(".card");
+      if (!clickedCardEl) return;
+      const leadSuit = inPlay.length > 0 ? inPlay[0].suit : null;
+      const cardValue = clickedCardEl.dataset.value;
+      const cardSuit = clickedCardEl.dataset.suit;
+      const playedCard = playerHands.player1.find(card => card.value === cardValue && card.suit === cardSuit);
+      if (!playedCard) {
+          console.error("Tricks.js: Clicked card not found in hand!");
+          return;
       }
-    }
+      const hasLeadSuitOnHand = playerHands.player1.some(card => card.suit === leadSuit);
+      if (leadSuit && hasLeadSuitOnHand && playedCard.suit !== leadSuit) {
+          controllerShowNotification(`You must play a ${leadSuit} card!`);
+          return; // Wait for valid input
+      }
   
-    checkGameOver();
+      // Valid play
+      humanPlayerTurn_tricks = false;
+      removeHumanCardListeners_tricks(); // Prevent multiple clicks
+       if (uiElements.handsEls && uiElements.handsEls.player1) {
+          uiElements.handsEls.player1.classList.remove('active-turn');
+      }
+      humanCardSelectionResolver_tricks(playedCard);
+      humanCardSelectionResolver_tricks = null;
+  }
   
-    roundComplete = false;
-    startRound(currentStarter);
-  });
+  function waitForPlayer1_tricks(leadSuit) {
+      console.log(`Tricks.js: Waiting for P1 (lead: ${leadSuit || 'None'})`);
+      return new Promise((resolve, reject) => {
+        // Clear previous resolver if any
+        if (humanCardSelectionResolver_tricks) {
+            console.warn("Tricks.js: waitForPlayer1 resolver already active! Clearing.");
+        }
+        humanCardSelectionResolver_tricks = resolve;
+        attachHumanCardListeners_tricks();
+        if (uiElements.handsEls && uiElements.handsEls.player1) {
+          uiElements.handsEls.player1.classList.add('active-turn');
+        }
+        // Add timeout?
+        // setTimeout(() => reject(new Error("Player 1 timed out")), 30000);
+      }).finally(() => {
+           console.log("Tricks.js: Player 1 promise finished.");
+           // Ensure resolver is cleared
+           if (humanCardSelectionResolver_tricks) humanCardSelectionResolver_tricks = null;
+           // Clean up UI
+           if (uiElements.handsEls && uiElements.handsEls.player1) {
+              uiElements.handsEls.player1.classList.remove('active-turn');
+           }
+           removeHumanCardListeners_tricks(); // Ensure listeners removed
+      });
+  }
+  
+  
+  // --- Registration Function (Exported) ---
+  export function register(controllerGameObj, sharedState) {
+      console.log("Tricks.js: Registering with controller.");
+      playerHands = sharedState.playerHands;
+      inPlay = sharedState.inPlay;
+      uiElements = sharedState.uiElements;
+      controllerUpdateState = sharedState.updateGameState;
+      controllerUpdateScores = sharedState.updateTotalScores; // Keep for now?
+      controllerShowNotification = sharedState.showNotification;
+      controllerDelay = sharedState.delay;
+      controllerActiveGameRef = controllerGameObj;
+  
+      // Populate the controller's activeGame object
+      controllerGameObj.name = 'tricks';
+      controllerGameObj.init = initTricksRound;
+      controllerGameObj.startTrick = startTrick_tricks;
+  
+      console.log("Tricks.js module registered.");
+      // Reset internal state on registration
+      tricksRoundStarted = false;
+      roundOver_tricks = false;
+      isFirstTrick_tricks = true;
+      trickInProgress = false;
+      roundScore_tricks = [0, 0, 0, 0];
+  }
+  
+  console.log("Tricks.js module loaded.");
+  
