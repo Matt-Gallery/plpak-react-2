@@ -24,13 +24,12 @@
             position: relative;
             min-height: 420px; /* Increased more significantly for visibility */
             height: 420px !important; /* Force height to be taller */
-            width: 130% !important; /* Force wider board */
-            max-width: 800px;
+            width: 130% !important; /* Restored to original wider size */
+            max-width: 800px; /* Restored to original max width */
             margin: 0 auto; /* Center the board */
             border: 2px solid darkgreen;
             background-color: #C8E6C9;
             flex-grow: 1;
-            transform: translateX(0); /* Reset any transform */
             padding-top: 20px; /* Add some padding for more space */
             padding-bottom: 20px;
         }
@@ -59,10 +58,10 @@
         .notifications { 
             margin-top: 10px; 
             font-weight: bold; 
-            color: blue; 
+            color: white; 
+            font-size: 125%; /* 25% larger font */
             min-height: 2em; 
             text-align: center; 
-            border: 1px dashed blue; 
             padding: 5px;
         }
         

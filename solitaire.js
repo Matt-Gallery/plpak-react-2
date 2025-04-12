@@ -251,23 +251,80 @@ function playCardSolitaire(card, player) {
     renderBoardSolitaire();
 }
 
-// Finds the first valid card an AI player can play
+// Finds the best card for an AI player to play based on strategic priorities
 function findAIPlay(player) {
-    // Simple AI: play the first valid card found
+    // 1. Find all valid plays
+    const validPlays = [];
     for (let i = 0; i < playerHands[player].length; i++) {
         const card = playerHands[player][i];
         if (isValidPlaySolitaire(card)) {
-            return card;
+            validPlays.push(card);
         }
     }
-    return null; // No valid play found
+    
+    if (validPlays.length === 0) return null; // No valid plays
+    if (validPlays.length === 1) return validPlays[0]; // Only one option
+    
+    // Check if this is the first move (Jack of Spades)
+    const isFirstMove = Object.keys(boardStacks).length === 0;
+    if (isFirstMove) {
+        // Must play Jack of Spades to start
+        const jackOfSpades = validPlays.find(card => card.value === 'J' && card.suit === '♠');
+        if (jackOfSpades) return jackOfSpades;
+    }
+    
+    // 2. Priority: Avoid playing Jacks unless necessary
+    const nonJackPlays = validPlays.filter(card => card.value !== 'J');
+    if (nonJackPlays.length > 0 && !isFirstMove) {
+        validPlays.length = 0; // Clear the array
+        nonJackPlays.forEach(card => validPlays.push(card)); // Replace with non-Jack options
+    }
+    
+    // 3. Priority: Play cards that would block other cards (identify sequence dependencies)
+    const cardRankIndex = {};
+    playerHands[player].forEach(card => {
+        cardRankIndex[`${card.value}${card.suit}`] = cardSequence.indexOf(card.value);
+    });
+    
+    const blockingCards = validPlays.filter(card => {
+        const currentRank = cardSequence.indexOf(card.value);
+        // Check if we have adjacent cards in our hand that would be blocked
+        const hasAdjacentHigher = playerHands[player].some(c => 
+            c.suit === card.suit && 
+            cardSequence.indexOf(c.value) === currentRank + 1);
+        
+        const hasAdjacentLower = playerHands[player].some(c => 
+            c.suit === card.suit && 
+            cardSequence.indexOf(c.value) === currentRank - 1);
+        
+        return hasAdjacentHigher || hasAdjacentLower;
+    });
+    
+    if (blockingCards.length > 0) {
+        return blockingCards[0]; // Play the first blocking card found
+    }
+    
+    // 4. Priority: Prefer playing 7s or Aces if possible
+    const sevenOrAcePlays = validPlays.filter(card => card.value === '7' || card.value === 'A');
+    if (sevenOrAcePlays.length > 0) {
+        return sevenOrAcePlays[0];
+    }
+    
+    // If no strategic play found, just play the first valid card
+    return validPlays[0];
+}
+
+// Helper function to format player IDs for display
+function formatPlayerName(playerId) {
+    const playerNum = playerId.replace('player', '');
+    return `Player ${playerNum}`;
 }
 
 // Handles a single turn for any player
 async function handlePlayerTurnSolitaire(player) {
     console.log(`Solitaire: Turn for ${player}`);
     let selectedCard = null;
-    showNotificationSolitaire(`${player}'s turn...`);
+    showNotificationSolitaire(`${formatPlayerName(player)}'s turn...`);
 
     // Highlight current player's hand area (optional)
     Object.values(uiHands).forEach(el => el.classList.remove('active-turn'));
@@ -283,7 +340,7 @@ async function handlePlayerTurnSolitaire(player) {
         // waitForHumanPlay resolves null if player passes/has no moves
     } else {
         // AI Logic
-        await delaySolitaire(800); // Simulate thinking
+        await delaySolitaire(1200); // Increased from 800 to 1200
         selectedCard = findAIPlay(player);
     }
 
@@ -291,13 +348,13 @@ async function handlePlayerTurnSolitaire(player) {
 
     if (selectedCard) {
         playCardSolitaire(selectedCard, player);
-        showNotificationSolitaire(`${player} played ${selectedCard.value}${selectedCard.suit}.`);
-        await delaySolitaire(500); // Short delay after play
+        showNotificationSolitaire(`${formatPlayerName(player)} played ${selectedCard.value}${selectedCard.suit}.`);
+        await delaySolitaire(750); // Increased from 500 to 750
         return true; // Player made a move
     } else {
         console.log(`Solitaire: ${player} has no valid moves and passes.`);
-        showNotificationSolitaire(`${player} passes.`);
-        await delaySolitaire(500); // Short delay after pass
+        showNotificationSolitaire(`${formatPlayerName(player)} passes.`);
+        await delaySolitaire(750); // Increased from 500 to 750
         return false; // Player passed
     }
 }
@@ -311,11 +368,30 @@ async function playRoundSolitaire() {
         return;
     }
 
-    // Play the mandatory J♠
-    const jackOfSpades = { value: 'J', suit: '♠' };
-    playCardSolitaire(jackOfSpades, starter);
-    showNotificationSolitaire(`${starter} starts with J♠.`);
-    await delaySolitaire(1000); // Pause after initial play
+    // Show who has the Jack of Spades
+    showNotificationSolitaire(`${formatPlayerName(starter)} has the Jack of Spades.`);
+    await delaySolitaire(1500); // Initial delay to see the starting state
+
+    // Handle the Jack of Spades start differently for human vs AI players
+    if (starter === 'player1') {
+        // For human player, prompt them to play the Jack of Spades
+        showNotificationSolitaire(`${formatPlayerName(starter)} has the Jack of Spades. Click it to start the game.`);
+        currentPlayer = starter;
+        
+        // Use the human player turn flow to let them select the Jack
+        isHumanTurn = true;
+        attachJackOfSpadesOnlyListener(); // Special listener that only allows Jack of Spades
+        let jackOfSpadesCard = await waitForHumanJackOfSpades();
+        isHumanTurn = false;
+        
+        // At this point, they've played the Jack of Spades, which will have updated the board
+    } else {
+        // For AI players, automatically play the Jack of Spades
+        const jackOfSpades = { value: 'J', suit: '♠' };
+        playCardSolitaire(jackOfSpades, starter);
+        showNotificationSolitaire(`${formatPlayerName(starter)} starts with J♠.`);
+        await delaySolitaire(1500); // Delay after playing Jack of Spades
+    }
 
     let playerIndex = players_solitaire.indexOf(starter);
     let consecutivePasses = 0; // To detect stuck game
@@ -346,7 +422,6 @@ async function playRoundSolitaire() {
              showNotificationSolitaire("Game Over! No more possible moves.");
              roundOver = true; // End the round if stuck
         }
-
     } // End while loop
 
     console.log("Solitaire: Round loop finished.");
@@ -368,7 +443,7 @@ function calculateScoresSolitaire() {
     // The player left retains a score of 0
 
     console.log("Solitaire: Final Round Scores:", scores);
-    showNotificationSolitaire(`Round Scores: P1=${scores.player1}, P2=${scores.player2}, P3=${scores.player3}, P4=${scores.player4}`);
+    showNotificationSolitaire(`Round Scores: Player 1=${scores.player1}, Player 2=${scores.player2}, Player 3=${scores.player3}, Player 4=${scores.player4}`);
     // In a real game, these scores would be returned or sent to the controller
     return scores;
 }
@@ -464,7 +539,7 @@ function waitForHumanPlay() {
                      resolve(null); // Resolve with null for pass
                      humanPlayResolver = null;
                 }
-            }, 1500);
+            }, 2250); // Increased from 1500 to 2250
         } else {
              // Listeners should have been attached by handlePlayerTurn
              console.log("Solitaire: Waiting for human card click...");
@@ -472,6 +547,80 @@ function waitForHumanPlay() {
     });
 }
 
+// Special listener for starting the game with Jack of Spades
+function attachJackOfSpadesOnlyListener() {
+    console.log("Attaching Jack of Spades listener...");
+    if (!uiHands.player1) return;
+    
+    uiHands.player1.querySelectorAll('.card').forEach(cardEl => {
+        cardEl.removeEventListener('click', handleStartingJackClick); // Prevent duplicates
+        
+        const card = {
+            value: cardEl.dataset.value,
+            suit: cardEl.dataset.suit
+        };
+        
+        // Only the Jack of Spades is clickable
+        if (card.value === 'J' && card.suit === '♠') {
+            console.log("  - Making Jack of Spades clickable");
+            cardEl.classList.add('playable');
+            cardEl.addEventListener('click', handleStartingJackClick);
+        } else {
+            cardEl.classList.remove('playable');
+        }
+    });
+}
+
+// Handle the Jack of Spades click to start the game
+function handleStartingJackClick(event) {
+    if (!isHumanTurn || !humanPlayResolver) {
+        console.log("Ignoring click - not human turn or resolver missing.");
+        return;
+    }
+    
+    const cardEl = event.target.closest('.card');
+    // Ensure it's the element with data attributes (might be span inside)
+    if (!cardEl || !cardEl.dataset.value) return;
+
+    const card = {
+        value: cardEl.dataset.value,
+        suit: cardEl.dataset.suit
+    };
+
+    // Make sure it's the Jack of Spades
+    if (card.value !== 'J' || card.suit !== '♠') {
+        console.warn("Human clicked non-Jack of Spades card at game start");
+        showNotificationSolitaire("You must play the Jack of Spades to start the game.");
+        return;
+    }
+
+    console.log("Solitaire: Human clicked Jack of Spades to start the game");
+    
+    // Play the card and resolve the promise
+    playCardSolitaire(card, 'player1');
+    showNotificationSolitaire(`${formatPlayerName('player1')} starts with J♠.`);
+    
+    // Clean up
+    uiHands.player1.querySelectorAll('.card').forEach(cardEl => {
+        cardEl.classList.remove('playable');
+        cardEl.removeEventListener('click', handleStartingJackClick);
+    });
+    
+    humanPlayResolver(card);
+    humanPlayResolver = null;
+}
+
+// Wait for human to play the Jack of Spades
+function waitForHumanJackOfSpades() {
+    return new Promise(resolve => {
+        // Clear any previous resolver just in case
+        if (humanPlayResolver) {
+            console.warn("waitForHumanJackOfSpades: Resolver already active!");
+        }
+        humanPlayResolver = resolve;
+        console.log("Solitaire: Waiting for human to play Jack of Spades...");
+    });
+}
 
 // --- Initialization for Test HTML ---
 // Exported function to be called by the test HTML page

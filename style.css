@@ -56,7 +56,10 @@ h1 {
 }
 
 body {
-  background-color: rgb(5, 148, 5);
+  position: relative;
+  background-color: green;
+  display: grid;
+  justify-content: center;
 }
 
 .play {
@@ -172,10 +175,30 @@ body {
 }
 
 .scoreboard {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: flex;
+  flex-direction: column;
   list-style: none;
+  align-items: flex-end;
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.score-row {
+  display: flex;
   align-items: center;
-  justify-content: center;
+  margin-bottom: 5px;
+}
+
+.score-name {
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  margin-right: 10px;
 }
 
 .score {
@@ -183,11 +206,11 @@ body {
   background-color: rgb(234, 255, 196);
   justify-content: center; /* Center horizontally */
   align-items: center; /* Center vertically */
-  width: 50px;
-  height: 50px;
-  margin: 5px 29px;
+  width: 40px;
+  height: 40px;
+  margin: 2px;
   border: 2px solid #000;
-  font-size: 20px; /* Ensure text is clearly visible */
+  font-size: 18px; /* Ensure text is clearly visible */
   font-weight: bold; /* Make the score stand out */
   text-align: center; /* Extra centering safeguard */
 }
