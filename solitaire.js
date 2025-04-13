@@ -100,8 +100,38 @@ function initSolitaireRound() {
         .board .card.board-card {
             transform-origin: center center;
         }
+        
+        /* Fix board positioning in solitaire mode */
+        .play {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .board, #solitaire-board {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            margin: 0 auto;
+        }
     `;
     document.head.appendChild(style);
+    
+    // Hide the Next Round button in solitaire mode
+    const nextButton = document.querySelector('.next');
+    if (nextButton) {
+        nextButton.style.display = 'none';
+    }
+    
+    // Center the Deal button
+    const dealButton = document.querySelector('.deal');
+    const buttonsContainer = document.querySelector('.buttons');
+    
+    if (dealButton && buttonsContainer) {
+        // Add a class to the buttons container for solitaire-specific styling
+        buttonsContainer.classList.add('buttons-solitaire-mode');
+    }
     
     // Update controller state
     controllerUpdateState({
@@ -226,12 +256,12 @@ function renderBoardSolitaire() {
     uiBoard.innerHTML = ''; // Clear board
 
     // Evenly space stacks across the board
-    // Shifted 35px left (increased from 30px) and 40px up
+    // Shifted 42px left (increased by 3px) and 90px up
     const jackPositions = { 
-        '♠': { x: 'calc(15% - 35px)', y: 'calc(50% - 80px)' }, 
-        '♥': { x: 'calc(38% - 35px)', y: 'calc(50% - 80px)' }, 
-        '♦': { x: 'calc(62% - 35px)', y: 'calc(50% - 80px)' }, 
-        '♣': { x: 'calc(85% - 35px)', y: 'calc(50% - 80px)' } 
+        '♠': { x: 'calc(15% - 42px)', y: 'calc(50% - 90px)' }, 
+        '♥': { x: 'calc(38% - 42px)', y: 'calc(50% - 90px)' }, 
+        '♦': { x: 'calc(62% - 42px)', y: 'calc(50% - 90px)' }, 
+        '♣': { x: 'calc(85% - 42px)', y: 'calc(50% - 90px)' } 
     };
     
     const cardWidth = 60; // Example width, should match CSS if possible
@@ -249,7 +279,7 @@ function renderBoardSolitaire() {
             for (let i = lowIndex; i <= highIndex; i++) {
                 const value = cardSequence[i];
                 const card = { value: value, suit: suit };
-                const offsetPercent = (i - jackIndex) * -40; 
+                const offsetPercent = (i - jackIndex) * -55; // Increased by another 20% from -46 to -55
                 let cardEl = createCardElement(card, jackPos.x, jackPos.y, offsetPercent, cardWidth, cardHeight);
                 uiBoard.appendChild(cardEl);
             }
@@ -257,7 +287,7 @@ function renderBoardSolitaire() {
     }
 }
 
-// Helper to create and position card elements
+// Function to create a card element for the board
 function createCardElement(card, x, y, yOffsetPercent, cardW, cardH) {
     const el = document.createElement('div');
     el.className = `card ${cardStyle_solitaire[card.suit]} board-card`;
@@ -270,19 +300,11 @@ function createCardElement(card, x, y, yOffsetPercent, cardW, cardH) {
     // Use calc for vertical positioning
     el.style.top = `calc(${y} + ${yOffsetPercent * (cardH / 100)}px)`;
     
-    // Different z-index logic based on whether card is above or below Jack
-    const zIndexBase = 100; // Start with a higher base value
-    const offsetSteps = Math.abs(yOffsetPercent / 40); // How many steps away from Jack
-    
-    // If offset is positive or zero, card is below Jack (going down - 10, 9, 8, 7)
-    // If offset is negative, card is above Jack (going up - Q, K, A)
-    if (yOffsetPercent >= 0) {
-        // Cards below Jack (lower ranks) - appear IN FRONT of previous cards
-        el.style.zIndex = zIndexBase + offsetSteps; 
-    } else {
-        // Cards above Jack (higher ranks) - appear BEHIND previous cards
-        el.style.zIndex = zIndexBase - offsetSteps;
-    }
+    // Simple z-index based on card rank: 7 (front) to A (back)
+    const cardRankIndex = cardSequence.indexOf(card.value);
+    // Invert the index: 7 (index 0) should have highest z-index, A (index 7) lowest
+    const zIndex = 200 - (cardRankIndex * 10); // Start high, decrease for each rank
+    el.style.zIndex = zIndex;
     
     return el;
 }
@@ -376,10 +398,28 @@ function getPlayerScoreForFinishPosition(position) {
 // Update a player's score in the UI
 function updatePlayerScore(playerId, score) {
     const playerIndex = players_solitaire.indexOf(playerId);
-    if (playerIndex !== -1 && uiScores[playerId]) {
-        // Fix: Only update UI, but don't actually store the score here
-        // We'll use the controller's score handling for that
-        console.log(`Solitaire: Player ${playerId} earned score: ${score}`);
+    if (playerIndex !== -1) {
+        // Create a scores array with the current player's score
+        const currentScores = [0, 0, 0, 0]; // Initialize with zeros
+        // Convert playerId (player1, player2, etc.) to array index (0, 1, etc.)
+        const scoreIndex = parseInt(playerId.replace('player', '')) - 1;
+        // Set the score for the specific player
+        currentScores[scoreIndex] = score;
+        
+        console.log(`Solitaire: Updating score for ${playerId} to ${score}`);
+        
+        // Update the UI score using the controller's function
+        if (controllerUpdateTotalScores) {
+            // Call the controller's update scores function
+            controllerUpdateTotalScores(currentScores, true); // true = partial update
+        } else {
+            console.error("Cannot update score: controllerUpdateTotalScores not available");
+        }
+        
+        // Also update the UI element if available
+        if (uiScores[playerId]) {
+            uiScores[playerId].textContent = score;
+        }
     }
 }
 
@@ -566,19 +606,18 @@ async function playRoundSolitaire() {
                 }
             }
             
-            // Notify that the round is over
-            showNotificationSolitaire("Round over! Click Deal to advance to the next round.");
+            // Call the endSolitaireRound function to:
+            // - Display final scores
+            // - Show the Next button again
+            // - Change "Deal" button text to "Next Hand"
+            // - Update controller state
+            endSolitaireRound();
             
-            // Convert our score object to the array format expected by the controller
-            const finalScores = getScoresArray();
+            // Log that the round is over
+            console.log("Solitaire: Round is over with scores:", getScoresArray());
             
-            // Fix: Explicitly use the controller's score update method
-            console.log("Solitaire: Sending final scores to controller:", finalScores);
-            controllerUpdateState({
-                roundOver: true,
-                trickInProgress: false,
-                currentRoundScore: finalScores
-            });
+            // Break out of the game loop - round is over
+            break;
         }
     } // End while loop
 
@@ -624,7 +663,54 @@ function checkRoundOverSolitaire() {
 
 function showNotificationSolitaire(message) {
     if (uiNotifications) {
-        uiNotifications.textContent = message;
+        // Add solitaire-specific notification styling
+        uiNotifications.innerHTML = `<div class="solitaire-notification">${message}</div>`;
+        
+        // Add inline styling for the solitaire notification
+        const style = document.createElement('style');
+        style.textContent = `
+            .solitaire-notification {
+                font-size: 191.25%; /* Reduced by 15% from 225% */
+                color: white;
+                font-weight: bold;
+                width: auto;
+                max-width: 100%;
+                display: inline-block;
+                padding: 10px 20px;
+                white-space: normal;
+                word-wrap: break-word;
+                text-align: center;
+                box-sizing: border-box;
+            }
+            
+            .notifications {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                text-align: center;
+            }
+        `;
+        
+        // Only add the style tag once
+        if (!document.querySelector('style[data-solitaire-notification]')) {
+            style.setAttribute('data-solitaire-notification', 'true');
+            document.head.appendChild(style);
+        }
+        
+        // Make sure parent has proper layout
+        uiNotifications.style.width = '100%';
+        uiNotifications.style.display = 'flex';
+        uiNotifications.style.justifyContent = 'center';
+        uiNotifications.style.flexWrap = 'wrap';
+        
+        // Get the notification element we just created
+        const notificationElement = uiNotifications.querySelector('.solitaire-notification');
+        if (notificationElement) {
+            // Ensure text is visible and container sized properly
+            notificationElement.style.minWidth = 'fit-content';
+            notificationElement.style.margin = '0 auto';
+        }
     } else {
         console.log("Notification:", message);
     }
@@ -795,5 +881,56 @@ function waitForHumanJackOfSpades() {
         console.log("Solitaire: Waiting for human to play Jack of Spades...");
     });
 }
+
+// When round ends, restore the Next button (called at end of round)
+function endSolitaireRound() {
+    // Mark round as over
+    roundOver = true;
+    
+    // Get final scores
+    const finalScores = getScoresArray();
+    
+    // Show final scores in notification
+    const scoreDisplay = players_solitaire.map(player => {
+        const playerIndex = parseInt(player.replace('player', '')) - 1;
+        const score = finalScores[playerIndex];
+        return `${formatPlayerName(player)}: ${score}`;
+    }).join(', ');
+    
+    showNotificationSolitaire(`Final scores: ${scoreDisplay}`);
+    
+    // Restore the Next Round button visibility for next rounds
+    const nextButton = document.querySelector('.next');
+    if (nextButton) {
+        nextButton.style.display = ''; // Reset to default display
+    }
+    
+    // Restore the buttons container to normal layout
+    const buttonsContainer = document.querySelector('.buttons');
+    if (buttonsContainer) {
+        buttonsContainer.classList.remove('buttons-solitaire-mode');
+    }
+    
+    // Force button state update to change Deal to Next Hand
+    const dealButton = document.querySelector('.deal');
+    if (dealButton) {
+        dealButton.textContent = 'Next Hand';
+        dealButton.disabled = false;
+    }
+    
+    // Update controller state with our scores
+    controllerUpdateState({
+        gameStarted: false,
+        roundOver: true,
+        trickInProgress: false,
+        currentRoundScore: finalScores
+    });
+    
+    showNotificationSolitaire("Solitaire Round complete! Click Next Hand.");
+}
+
+// TEMPORARY: Expose the endSolitaireRound function globally for the skip button
+// TO REMOVE: Delete this line when removing the skip button
+window.endSolitaireRound = endSolitaireRound;
 
 console.log("solitaire.js module loaded");

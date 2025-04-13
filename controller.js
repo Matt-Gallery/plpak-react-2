@@ -15,10 +15,10 @@ const winnerStyle = { player1: "Player 1", player2: "Player 2", player3: "Player
 // --- Game Cycle Management ---
 // Define 4 cycles with different starting players
 const gameCycles = [
-    { startingPlayer: "player2", cycleCompleted: false },
-    { startingPlayer: "player3", cycleCompleted: false },
-    { startingPlayer: "player4", cycleCompleted: false },
-    { startingPlayer: "player1", cycleCompleted: false }
+    { startingPlayer: "player2", cycleCompleted: false, scores: [0, 0, 0, 0] },
+    { startingPlayer: "player3", cycleCompleted: false, scores: [0, 0, 0, 0] },
+    { startingPlayer: "player4", cycleCompleted: false, scores: [0, 0, 0, 0] },
+    { startingPlayer: "player1", cycleCompleted: false, scores: [0, 0, 0, 0] }
 ];
 let currentCycleIndex = 0; // Track which cycle we're in
 
@@ -64,12 +64,54 @@ let roundTitleEl, dealButton, nextButton, scoreboardEls, playAreas, handsEls, no
         if (existingIndex === null) {
              localStorage.setItem('plpakRoundIndex', '0');
              localStorage.setItem('plpakCycleIndex', '0');
+             // Initialize cycle scores in localStorage
+             localStorage.setItem('plpakCycleScores', JSON.stringify([
+                 [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]
+             ]));
              console.log("Controller: Set initial round index to 0 and cycle index to 0.");
         }
     }
     
     // Set current cycle index based on localStorage
     currentCycleIndex = parseInt(localStorage.getItem('plpakCycleIndex') || '0');
+    
+    // Load cycle scores from localStorage if available
+    const storedCycleScores = localStorage.getItem('plpakCycleScores');
+    if (storedCycleScores) {
+        try {
+            const parsedCycleScores = JSON.parse(storedCycleScores);
+            if (Array.isArray(parsedCycleScores) && parsedCycleScores.length === 4) {
+                // Update each cycle's scores
+                parsedCycleScores.forEach((scores, index) => {
+                    if (Array.isArray(scores) && scores.length === 4) {
+                        gameCycles[index].scores = scores;
+                    } else {
+                        console.warn(`Controller: Invalid cycle scores format for cycle ${index}:`, scores);
+                        gameCycles[index].scores = [0, 0, 0, 0]; // Reset to default
+                    }
+                });
+                console.log("Controller: Loaded cycle scores from localStorage:", parsedCycleScores);
+            } else {
+                console.warn("Controller: Invalid cycle scores array format:", parsedCycleScores);
+                // Reset all cycle scores
+                gameCycles.forEach(cycle => cycle.scores = [0, 0, 0, 0]);
+                // Re-save the corrected format
+                localStorage.setItem('plpakCycleScores', JSON.stringify(gameCycles.map(c => c.scores)));
+            }
+        } catch (e) {
+            console.error("Controller: Error loading cycle scores", e);
+            // Reset all cycle scores
+            gameCycles.forEach(cycle => cycle.scores = [0, 0, 0, 0]);
+            // Re-save the corrected format
+            localStorage.setItem('plpakCycleScores', JSON.stringify(gameCycles.map(c => c.scores)));
+        }
+    } else {
+        // No cycle scores in localStorage, initialize to zeros
+        console.log("Controller: No cycle scores in localStorage, initializing to zeros");
+        gameCycles.forEach(cycle => cycle.scores = [0, 0, 0, 0]);
+        localStorage.setItem('plpakCycleScores', JSON.stringify(gameCycles.map(c => c.scores)));
+    }
+    
     // Set active game starter based on current cycle
     activeGame.currentStarter = gameCycles[currentCycleIndex].startingPlayer;
     
@@ -102,14 +144,20 @@ function advanceToNextRound() {
 
     // IMPORTANT: Update totalScores by adding the just-completed round's score
     totalScores = getTotalScores(); // Get latest total from storage
+    
+    // Add current round score to current cycle's scores
     for(let i=0; i<4; i++) {
+        gameCycles[currentCycleIndex].scores[i] += currentRoundScore[i] || 0;
         totalScores[i] += currentRoundScore[i] || 0;
     }
-    console.log(`Controller: Added round score ${currentRoundScore.join(',')}. New total: ${totalScores.join(',')}`);
+    console.log(`Controller: Added round score ${currentRoundScore.join(',')} to cycle ${currentCycleIndex+1}. Updated cycle scores: ${gameCycles[currentCycleIndex].scores.join(',')}`);
+    console.log(`Controller: New total scores: ${totalScores.join(',')}`);
     currentRoundScore = [0, 0, 0, 0]; // Reset for next round
 
     // Save the UPDATED total scores
     localStorage.setItem('plpakTotalScores', JSON.stringify(totalScores));
+    // Save cycle scores
+    localStorage.setItem('plpakCycleScores', JSON.stringify(gameCycles.map(c => c.scores)));
     
     // Check if we need to advance to the next cycle
     if (currentIndex % gameRounds.length === 0 && currentIndex > 0) {
@@ -149,8 +197,14 @@ function resetGameSequence() {
     totalScores = [0, 0, 0, 0];
     currentRoundScore = [0, 0, 0, 0]; // Reset current round score too
     currentCycleIndex = 0;
-    // Reset cycle completion status
-    gameCycles.forEach(cycle => cycle.cycleCompleted = false);
+    
+    // Reset cycle completion status and scores
+    gameCycles.forEach(cycle => {
+        cycle.cycleCompleted = false;
+        cycle.scores = [0, 0, 0, 0];
+    });
+    localStorage.setItem('plpakCycleScores', JSON.stringify(gameCycles.map(c => c.scores)));
+    
     // Set starter based on first cycle
     activeGame.currentStarter = gameCycles[currentCycleIndex].startingPlayer;
 }
@@ -226,15 +280,75 @@ window.updateTotalScores = function(roundScoreToAdd) {
 
 function displayScores() {
     if (!scoreboardEls) cacheDOMElements();
+    
     // Get base total scores from storage (scores from previous rounds)
     const baseTotalScores = getTotalScores();
-    if (scoreboardEls.length === 4) {
-        console.log(`Controller: Displaying scores. Base Total: ${baseTotalScores.join(',')}, Current Round: ${currentRoundScore.join(',')}`);
-        scoreboardEls.forEach((el, i) => {
-            // Display is sum of previous totals + current round's accumulation
-            const displayValue = (baseTotalScores[i] || 0) + (currentRoundScore[i] || 0);
-            el.textContent = `${displayValue}`;
-        });
+    
+    // Calculate totals with current round
+    const displayTotals = baseTotalScores.map((base, i) => base + (currentRoundScore[i] || 0));
+    
+    // Generate detailed scoring log
+    let scoreLog = "Controller: Score breakdown:";
+    scoreLog += `\n- Current cycle index: ${currentCycleIndex}`;
+    scoreLog += `\n- Current round scores: ${currentRoundScore.join(', ')}`;
+    scoreLog += `\n- Base total scores: ${baseTotalScores.join(', ')}`;
+    scoreLog += `\n- Display totals: ${displayTotals.join(', ')}`;
+    
+    for (let cycle = 0; cycle < 4; cycle++) {
+        const cycleScores = gameCycles[cycle].scores;
+        scoreLog += `\n- Cycle ${cycle+1} scores: ${cycleScores.join(', ')}`;
+        if (cycle === currentCycleIndex) {
+            const withCurrentRound = cycleScores.map((score, idx) => score + (currentRoundScore[idx] || 0));
+            scoreLog += ` (with current round: ${withCurrentRound.join(', ')})`;
+        }
+    }
+    console.log(scoreLog);
+    
+    // Get all score elements for more granular control
+    const allScoreEls = document.querySelectorAll('.score');
+    if (allScoreEls.length > 0) {
+        // Group by player (every 5 elements: 4 cycles + 1 total)
+        for (let player = 0; player < 4; player++) {
+            // Update each cycle score
+            for (let cycle = 0; cycle < 4; cycle++) {
+                const scoreIndex = player * 5 + cycle; // 5 cells per player (4 cycles + total)
+                if (allScoreEls[scoreIndex]) {
+                    // Get the cycle score
+                    let cycleScore = gameCycles[cycle].scores[player];
+                    
+                    // For the current active cycle, add the current round's score
+                    if (cycle === currentCycleIndex) {
+                        cycleScore += currentRoundScore[player] || 0;
+                    }
+                    
+                    // Show cycle score if it has any value
+                    allScoreEls[scoreIndex].textContent = cycleScore !== 0 ? cycleScore : '';
+                    
+                    // Highlight current cycle
+                    if (cycle === currentCycleIndex) {
+                        allScoreEls[scoreIndex].classList.add('current-cycle');
+                    } else {
+                        allScoreEls[scoreIndex].classList.remove('current-cycle');
+                    }
+                }
+            }
+            
+            // Update total score (5th element for each player)
+            const totalScoreIndex = player * 5 + 4;
+            if (allScoreEls[totalScoreIndex]) {
+                allScoreEls[totalScoreIndex].textContent = displayTotals[player];
+            }
+        }
+    } else {
+        console.warn("Controller: Could not find score elements for granular display");
+        
+        // Fallback to old method
+        if (scoreboardEls && scoreboardEls.length === 4) {
+            scoreboardEls.forEach((el, i) => {
+                const displayValue = displayTotals[i];
+                el.textContent = `${displayValue}`;
+            });
+        }
     }
 }
 
@@ -245,14 +359,17 @@ function updateButtonStates() {
          console.log("Controller: Setting Deal=ENABLED, Next=DISABLED (Round Over)");
          dealButton.disabled = false;
          nextButton.disabled = true;
+         dealButton.textContent = "Next Hand";
      } else if (gameStarted) {
           console.log("Controller: Setting Deal=DISABLED, Next=ENABLED (Game Started)");
           dealButton.disabled = true;
           nextButton.disabled = false;
+          dealButton.textContent = "Deal";
      } else { // Not started yet (gameStarted is false, roundOver is false)
           console.log("Controller: Setting Deal=ENABLED, Next=DISABLED (Initial/Ready State)"); 
           dealButton.disabled = false; // <<< Ensure Deal is ENABLED here
           nextButton.disabled = true;
+          dealButton.textContent = "Deal";
      }
 }
 
@@ -261,7 +378,7 @@ function cacheDOMElements() {
      roundTitleEl = document.querySelector(".round");
      dealButton = document.querySelector(".deal");
      nextButton = document.querySelector(".next");
-     scoreboardEls = document.querySelectorAll(".score");
+     scoreboardEls = document.querySelectorAll(".score.total");
      playAreas = {
         player1: document.querySelector(".board .player1"),
         player2: document.querySelector(".board .player2"),
@@ -285,6 +402,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log("Controller: DOM Loaded.");
     cacheDOMElements(); 
     
+    // Move promptForPlayerName after all other initialization
+    // to ensure the DOM is fully ready
+    
     roundTitleEl.textContent = getCurrentRoundTitle();
     // Initial display: Show total scores from storage (currentRoundScore is 0 initially)
     displayScores(); 
@@ -292,6 +412,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Attach central listeners ONCE
     dealButton.addEventListener('click', handleDealClick); 
     nextButton.addEventListener('click', handleNextTrickClick); 
+    
+    // TEMPORARY: Add Skip Round button for testing
+    addTemporarySkipButton();
+
+    // Add a name reset button for testing
+    addNameResetButton();
+    
+    // Prompt for player name AFTER other UI elements are set up
+    console.log("Controller: Prompting for player name...");
+    promptForPlayerName();
 
     const currentRoundName = getCurrentRoundName();
     if (currentRoundName) {
@@ -312,7 +442,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                      // Make controller functions available to module
                      updateGameState: window.updateGameState, 
                      updateTotalScores: window.updateTotalScores,
-                     showNotification: (msg, dur) => { /* Controller could handle this */ notificationsEl.innerHTML = `<div class="notification">${msg}</div>`; setTimeout(()=>{ if (notificationsEl.firstChild && notificationsEl.firstChild.textContent === msg) notificationsEl.innerHTML = ""; }, dur || 3000); },
+                     showNotification: showNotification,
                      delay: (ms) => new Promise(resolve => setTimeout(resolve, ms)) // Provide delay
                  });
                  console.log("Controller: Game module registered.");
@@ -341,6 +471,114 @@ document.addEventListener('DOMContentLoaded', async () => {
          displayScores();
     }
 });
+
+// TEMPORARY: Function to add a skip button for testing
+function addTemporarySkipButton() {
+    // Create the button
+    const skipButton = document.createElement('button');
+    skipButton.textContent = '⏭️ SKIP (testing only)';
+    skipButton.style.position = 'fixed';
+    skipButton.style.top = '10px';
+    skipButton.style.right = '10px';
+    skipButton.style.zIndex = '9999';
+    skipButton.style.backgroundColor = '#ff5722';
+    skipButton.style.color = 'white';
+    skipButton.style.border = '2px solid black';
+    skipButton.style.borderRadius = '4px';
+    skipButton.style.padding = '5px 10px';
+    skipButton.style.cursor = 'pointer';
+    
+    // Add tooltip explaining what it does
+    skipButton.title = 'Skip current round (for testing only)';
+    
+    // Add event listener
+    skipButton.addEventListener('click', () => {
+        console.log("TESTING: Skip button clicked - advancing to next round");
+        
+        // For standard rounds (tricks, hearts, queens, king)
+        // we force their completion by setting scores and marking as over
+        if (activeGame && activeGame.name) {
+            const roundName = activeGame.name;
+            
+            if (roundName === 'solitaire' && typeof window.endSolitaireRound === 'function') {
+                // Special handling for solitaire
+                window.endSolitaireRound();
+            } else {
+                // For standard rounds, simulate the round ending by:
+                // 1. Setting round scores
+                // 2. Marking the round as over
+                // 3. Calling the round advancement
+                
+                // Set dummy scores (everyone gets -1 for a quick test)
+                currentRoundScore = [-1, -1, -1, -1];
+                
+                // Update state
+                roundOver = true;
+                gameStarted = true;
+                trickInProgress = false;
+                
+                // Update button states 
+                updateButtonStates();
+                
+                // Show notification
+                if (notificationsEl) {
+                    notificationsEl.innerHTML = `<div class="notification">Testing: Round skipped. Click Next Hand.</div>`;
+                }
+                
+                // Since we've set roundOver = true, the next Deal button click
+                // will trigger advanceToNextRound(), so we don't advance immediately
+                
+                // Force the deal button to show "Next Hand"
+                if (dealButton) {
+                    dealButton.textContent = "Next Hand";
+                }
+                
+                // Display the scores we've set
+                displayScores();
+            }
+        } else {
+            // If no active game, just advance
+            advanceToNextRound();
+        }
+    });
+    
+    // Add to document
+    document.body.appendChild(skipButton);
+    
+    console.log("Controller: Added temporary skip button for testing");
+}
+
+// TEMPORARY: Function to add a name reset button
+function addNameResetButton() {
+    // Create the button
+    const resetButton = document.createElement('button');
+    resetButton.textContent = '👤 Reset Name';
+    resetButton.style.position = 'fixed';
+    resetButton.style.bottom = '20px';
+    resetButton.style.right = '20px';
+    resetButton.style.zIndex = '9999';
+    resetButton.style.backgroundColor = '#3498db';
+    resetButton.style.color = 'white';
+    resetButton.style.border = '2px solid black';
+    resetButton.style.borderRadius = '4px';
+    resetButton.style.padding = '5px 10px';
+    resetButton.style.cursor = 'pointer';
+    
+    // Add tooltip explaining what it does
+    resetButton.title = 'Change your player name';
+    
+    // Add event listener
+    resetButton.addEventListener('click', () => {
+        console.log("Resetting player name...");
+        localStorage.removeItem('plpakPlayerName');
+        promptForPlayerName();
+    });
+    
+    // Add to document
+    document.body.appendChild(resetButton);
+    
+    console.log("Controller: Added name reset button");
+}
 
 // --- Button Handlers (Delegate to activeGame) ---
 function handleDealClick() {
@@ -372,7 +610,7 @@ function handleDealClick() {
     } else if (gameStarted) {
          // Deal clicked mid-round
          console.log("Controller: Deal clicked but round already in progress.");
-         controllerShowNotification("Round is already in progress."); 
+         showNotification("Round is already in progress."); 
     } else {
          // Unexpected state
          console.error(`Controller: Deal clicked, but activeGame.init is not ready or other unexpected state!`);
@@ -427,5 +665,220 @@ function registerRound(gameName, functions) {
         updateButtonStates(); // Update buttons (should enable Deal)
     } else {
         console.warn(`Controller: Script for ${gameName} loaded, but current round is ${getCurrentRoundName()}. Ignoring registration.`);
+    }
+}
+
+function showNotification(msg, dur) {
+    if (notificationsEl) {
+        // Use solitaire-style notifications for all rounds
+        notificationsEl.innerHTML = `<div class="solitaire-notification">${msg}</div>`;
+        
+        // Ensure consistent styling across all rounds
+        const style = document.createElement('style');
+        style.textContent = `
+            .solitaire-notification {
+                background-color: rgba(0, 0, 0, 0.6);
+                color: white;
+                font-size: 191.25%;
+                font-weight: bold;
+                padding: 10px 20px;
+                border: 1px solid #ffcc00;
+                border-radius: 10px;
+                width: auto;
+                max-width: 100%;
+                display: inline-block;
+                white-space: normal;
+                word-wrap: break-word;
+                text-align: center;
+                box-sizing: border-box;
+            }
+            
+            .notifications {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                text-align: center;
+            }
+        `;
+        
+        // Only add the style tag once
+        if (!document.querySelector('style[data-notification-style]')) {
+            style.setAttribute('data-notification-style', 'true');
+            document.head.appendChild(style);
+        }
+        
+        // Make sure parent has proper layout
+        notificationsEl.style.width = '100%';
+        notificationsEl.style.display = 'flex';
+        notificationsEl.style.justifyContent = 'center';
+        notificationsEl.style.flexWrap = 'wrap';
+        
+        // Get the notification element we just created
+        const notificationElement = notificationsEl.querySelector('.solitaire-notification');
+        if (notificationElement) {
+            // Ensure text is visible and container sized properly
+            notificationElement.style.minWidth = 'fit-content';
+            notificationElement.style.margin = '0 auto';
+        }
+        
+        // Auto-clear after duration
+        setTimeout(() => {
+            if (notificationsEl.firstChild && notificationsEl.firstChild.textContent === msg) {
+                notificationsEl.innerHTML = "";
+            }
+        }, dur || 3000);
+    }
+}
+
+// Function to prompt for player name
+function promptForPlayerName() {
+    // Check if name is already stored
+    const storedName = localStorage.getItem('plpakPlayerName');
+    console.log("Checking for stored player name:", storedName);
+    
+    if (!storedName) {
+        console.log("No stored name found, showing dialog");
+        // Create a modal dialog for name input
+        createNameInputDialog();
+    } else {
+        console.log("Using stored name:", storedName);
+        // Use stored name
+        updatePlayerNameInUI(storedName);
+        // Also update winnerStyle
+        winnerStyle.player1 = storedName;
+    }
+}
+
+// Function to create a name input dialog in the UI
+function createNameInputDialog() {
+    // Create modal container
+    const modal = document.createElement('div');
+    modal.className = 'name-input-modal';
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    modal.style.display = 'flex';
+    modal.style.justifyContent = 'center';
+    modal.style.alignItems = 'center';
+    modal.style.zIndex = '1000';
+    
+    // Create dialog box
+    const dialog = document.createElement('div');
+    dialog.className = 'name-dialog';
+    dialog.style.backgroundColor = 'white';
+    dialog.style.borderRadius = '8px';
+    dialog.style.padding = '20px';
+    dialog.style.width = '300px';
+    dialog.style.maxWidth = '80%';
+    dialog.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+    dialog.style.textAlign = 'center';
+    
+    // Create dialog content
+    const title = document.createElement('h2');
+    title.textContent = 'Welcome to Card Game!';
+    title.style.color = 'black';
+    title.style.marginBottom = '15px';
+    
+    const label = document.createElement('p');
+    label.textContent = 'Please enter your name:';
+    label.style.color = 'black';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Human';
+    input.value = '';
+    input.style.width = '100%';
+    input.style.padding = '8px';
+    input.style.margin = '10px 0';
+    input.style.border = '1px solid #ccc';
+    input.style.borderRadius = '4px';
+    input.style.boxSizing = 'border-box';
+    
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.justifyContent = 'space-between';
+    buttonContainer.style.marginTop = '15px';
+    
+    const playButton = document.createElement('button');
+    playButton.textContent = 'Play';
+    playButton.style.padding = '8px 16px';
+    playButton.style.backgroundColor = 'green';
+    playButton.style.color = 'white';
+    playButton.style.border = 'none';
+    playButton.style.borderRadius = '4px';
+    playButton.style.cursor = 'pointer';
+    
+    const skipButton = document.createElement('button');
+    skipButton.textContent = 'Continue as Human';
+    skipButton.style.padding = '8px 16px';
+    skipButton.style.backgroundColor = '#ccc';
+    skipButton.style.color = 'black';
+    skipButton.style.border = 'none';
+    skipButton.style.borderRadius = '4px';
+    skipButton.style.cursor = 'pointer';
+    
+    // Add event listeners
+    playButton.addEventListener('click', () => {
+        const name = input.value.trim() || 'Human';
+        savePlayerName(name);
+        document.body.removeChild(modal);
+    });
+    
+    skipButton.addEventListener('click', () => {
+        savePlayerName('Human');
+        document.body.removeChild(modal);
+    });
+    
+    // Focus the input when the dialog appears
+    setTimeout(() => input.focus(), 100);
+    
+    // Add enter key functionality
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            playButton.click();
+        }
+    });
+    
+    // Assemble the dialog
+    dialog.appendChild(title);
+    dialog.appendChild(label);
+    dialog.appendChild(input);
+    buttonContainer.appendChild(skipButton);
+    buttonContainer.appendChild(playButton);
+    dialog.appendChild(buttonContainer);
+    modal.appendChild(dialog);
+    
+    // Add to document
+    document.body.appendChild(modal);
+}
+
+// Function to save player name and update UI
+function savePlayerName(name) {
+    localStorage.setItem('plpakPlayerName', name);
+    console.log("Saving player name:", name);
+    
+    // Update winnerStyle to use player name
+    winnerStyle.player1 = name;
+    
+    // Force immediate UI update
+    updatePlayerNameInUI(name);
+}
+
+// Function to update player name in UI
+function updatePlayerNameInUI(name) {
+    console.log("Updating UI with player name:", name);
+    
+    // Specifically target the first player's name element in the scoreboard
+    const scoreRows = document.querySelectorAll('.score-row');
+    if (scoreRows && scoreRows.length > 0) {
+        const firstRowNameEl = scoreRows[0].querySelector('.score-name');
+        if (firstRowNameEl) {
+            console.log(`Changing first player name from "${firstRowNameEl.textContent}" to "${name}"`);
+            firstRowNameEl.textContent = name;
+        }
     }
 } 
