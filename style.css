@@ -72,8 +72,8 @@ body {
 }
 
 .board {
-  width: 370px;
-  height: 370px;
+  width: 488px;
+  height: 488px;
   background-color: green;
   border-radius: 6px;
   background-image: url("static assets/logo 6.png");
@@ -90,7 +90,7 @@ body {
 .player1 {
   grid-area: a;
   justify-self: center;
-  margin-top: -47px;
+  margin-top: -12px;
 }
 
 .player2 {
@@ -183,36 +183,36 @@ body {
   list-style: none;
   align-items: flex-end;
   background-color: rgba(0, 0, 0, 0.2);
-  padding: 10px;
-  border-radius: 8px;
+  padding: 12px;
+  border-radius: 10px;
   z-index: 10;
 }
 
 .score-row {
   display: flex;
   align-items: center;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
 
 .score-name {
   color: white;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: bold;
-  margin-right: 10px;
+  margin-right: 12px;
 }
 
 .score {
   display: flex;
   background-color: rgb(234, 255, 196);
-  justify-content: center; /* Center horizontally */
-  align-items: center; /* Center vertically */
-  width: 40px;
-  height: 40px;
+  justify-content: center;
+  align-items: center;
+  width: 48px;
+  height: 48px;
   margin: 2px;
   border: 2px solid #000;
-  font-size: 18px; /* Ensure text is clearly visible */
-  font-weight: bold; /* Make the score stand out */
-  text-align: center; /* Extra centering safeguard */
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
 }
 
 .human {

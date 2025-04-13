@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>King of Hearts Game</title>
+    <title>Card Game</title>
     <link rel="stylesheet" href="./style.css" />
     <!-- Load Controller as an ES6 Module -->
     <script type="module" src="./controller.js"></script>
@@ -11,6 +11,7 @@
   <body>
     <h1 class="round">Loading...</h1>
 
+    <!-- Vertical scoreboard in top-right corner -->
     <section class="scoreboard">
       <div class="score-row">
         <div class="score-name">Human</div>
@@ -30,10 +31,13 @@
       </div>
     </section>
 
-<section class="notifications"></section>
+    <!-- Notifications area -->
+    <section class="notifications"></section>
 
+    <!-- Top hand (Player 3) -->
     <section class="tophand"></section>
 
+    <!-- Middle section with side hands and board -->
     <section class="play">
       <div class="hand-2"></div>
 
@@ -47,8 +51,10 @@
       <div class="hand-4"></div>
     </section>
 
+    <!-- Bottom hand (Player 1/Human) -->
     <section class="human"></section>
 
+    <!-- Game controls -->
     <section class="buttons">
       <button class="deal">Deal</button>
       <button class="next">Next Round</button>

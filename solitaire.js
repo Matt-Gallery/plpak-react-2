@@ -24,12 +24,95 @@ let finishOrder = []; // Tracks player IDs in the order they finish
 let isHumanTurn = false;
 let humanPlayResolver = null; // Promise resolver for human turn
 
-// --- Cached UI Elements (will be populated by test HTML) ---\
+// --- Controller Integration ---
+let controllerUpdateState; // Function to update controller state
+let controllerUpdateTotalScores; // Function to update total scores
+let controllerShowNotification; // Function to show notifications
+let controllerDelay; // Function for delays
+
+// --- Cached UI Elements ---
 let uiHands = {};
 let uiBoard = null;
 let uiNotifications = null;
+let uiScores = {}; // Scoreboard elements
+
+// --- Module Registration ---
+export function register(activeGame, controllerState) {
+    console.log("Solitaire: Registering with controller");
+    
+    // Store controller functions
+    controllerUpdateState = controllerState.updateGameState;
+    controllerUpdateTotalScores = controllerState.updateTotalScores;
+    controllerShowNotification = controllerState.showNotification;
+    controllerDelay = controllerState.delay;
+    
+    // Cache UI elements
+    uiHands.player1 = controllerState.uiElements.handsEls.player1;
+    uiHands.player2 = controllerState.uiElements.handsEls.player2;
+    uiHands.player3 = controllerState.uiElements.handsEls.player3;
+    uiHands.player4 = controllerState.uiElements.handsEls.player4;
+    
+    // Fix: Use the board element from the controller directly
+    uiBoard = document.querySelector('.board');
+    console.log("Solitaire: Board element found:", uiBoard);
+    
+    uiNotifications = controllerState.uiElements.notificationsEl;
+    
+    // Cache score elements
+    if (controllerState.uiElements.scoreboardEls && controllerState.uiElements.scoreboardEls.length === 4) {
+        uiScores.player1 = controllerState.uiElements.scoreboardEls[0];
+        uiScores.player2 = controllerState.uiElements.scoreboardEls[1];
+        uiScores.player3 = controllerState.uiElements.scoreboardEls[2];
+        uiScores.player4 = controllerState.uiElements.scoreboardEls[3];
+    }
+    
+    // Export functions to controller
+    activeGame.name = "solitaire";
+    activeGame.init = initSolitaireRound;
+    activeGame.startTrick = null; // Not used in solitaire, but required by controller
+    
+    console.log("Solitaire: Registration complete");
+}
 
 // --- Core Functions ---
+
+// Initialize the solitaire round (called by controller's Deal button)
+function initSolitaireRound() {
+    console.log("Solitaire: Initializing round");
+    
+    // Reset game state
+    playerHands = { player1: [], player2: [], player3: [], player4: [] };
+    boardStacks = {};
+    finishOrder = [];
+    roundOver = false;
+    currentPlayer = null;
+    isHumanTurn = false;
+    humanPlayResolver = null;
+    
+    // Add CSS to center cards on the board
+    const style = document.createElement('style');
+    style.textContent = `
+        .board {
+            position: relative;
+        }
+        .board .card.board-card {
+            transform-origin: center center;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Update controller state
+    controllerUpdateState({
+        gameStarted: true,
+        roundOver: false,
+        trickInProgress: true, // Mark as in progress to disable Next button
+        currentRoundScore: [0, 0, 0, 0]
+    });
+    
+    // Deal cards and start the game
+    dealCardsSolitaire();
+    playRoundSolitaire();
+}
 
 function dealCardsSolitaire() {
     console.log("Solitaire: Dealing cards...");
@@ -128,12 +211,15 @@ function renderBoardSolitaire() {
     }
     uiBoard.innerHTML = ''; // Clear board
 
+    // Evenly space stacks across the board
+    // Shifted 35px left (increased from 30px) and 40px up
     const jackPositions = { 
-        '♠': { x: '10%', y: 'calc(50% - 20px)' }, 
-        '♥': { x: '35%', y: 'calc(50% - 20px)' }, 
-        '♦': { x: '60%', y: 'calc(50% - 20px)' }, 
-        '♣': { x: '85%', y: 'calc(50% - 20px)' } 
+        '♠': { x: 'calc(15% - 35px)', y: 'calc(50% - 80px)' }, 
+        '♥': { x: 'calc(38% - 35px)', y: 'calc(50% - 80px)' }, 
+        '♦': { x: 'calc(62% - 35px)', y: 'calc(50% - 80px)' }, 
+        '♣': { x: 'calc(85% - 35px)', y: 'calc(50% - 80px)' } 
     };
+    
     const cardWidth = 60; // Example width, should match CSS if possible
     const cardHeight = 90; // Example height
 
@@ -149,7 +235,7 @@ function renderBoardSolitaire() {
             for (let i = lowIndex; i <= highIndex; i++) {
                 const value = cardSequence[i];
                 const card = { value: value, suit: suit };
-                const offsetPercent = (i - jackIndex) * -40; // Decreased overlap another 15% (from -35 to -40)
+                const offsetPercent = (i - jackIndex) * -40; 
                 let cardEl = createCardElement(card, jackPos.x, jackPos.y, offsetPercent, cardWidth, cardHeight);
                 uiBoard.appendChild(cardEl);
             }
@@ -162,10 +248,13 @@ function createCardElement(card, x, y, yOffsetPercent, cardW, cardH) {
     const el = document.createElement('div');
     el.className = `card ${cardStyle_solitaire[card.suit]} board-card`;
     el.innerHTML = `<span>${card.value}</span>${card.suit}`;
+    
+    // Position card
     el.style.position = 'absolute';
     el.style.left = x;
-    // Use calc to center and apply offset based on card height
-    el.style.top = `calc(${y} + ${yOffsetPercent * (cardH / 100)}px)`; // Offset relative to card height
+    
+    // Use calc for vertical positioning
+    el.style.top = `calc(${y} + ${yOffsetPercent * (cardH / 100)}px)`;
     
     // Different z-index logic based on whether card is above or below Jack
     const zIndexBase = 100; // Start with a higher base value
@@ -242,6 +331,14 @@ function playCardSolitaire(card, player) {
     if (playerHands[player].length === 0 && !finishOrder.includes(player)) {
         console.log(`Solitaire: ${player} finished!`);
         finishOrder.push(player);
+        
+        // Update score immediately when a player finishes
+        const playerScore = getPlayerScoreForFinishPosition(finishOrder.indexOf(player));
+        updatePlayerScore(player, playerScore);
+        
+        // Notify about player finishing
+        showNotificationSolitaire(`${formatPlayerName(player)} finished in position ${finishOrder.length} with score ${playerScore}.`);
+        
         // Check if round ended because 3 players finished
         roundOver = checkRoundOverSolitaire();
     }
@@ -249,6 +346,27 @@ function playCardSolitaire(card, player) {
     // Re-render hand and board
     renderHandsSolitaire();
     renderBoardSolitaire();
+}
+
+// Helper to get the score for a finish position
+function getPlayerScoreForFinishPosition(position) {
+    // Return score based on finish position
+    switch(position) {
+        case 0: return -5; // First place
+        case 1: return -3; // Second place
+        case 2: return -1; // Third place
+        default: return 0; // Last place (doesn't finish)
+    }
+}
+
+// Update a player's score in the UI
+function updatePlayerScore(playerId, score) {
+    const playerIndex = players_solitaire.indexOf(playerId);
+    if (playerIndex !== -1 && uiScores[playerId]) {
+        // Fix: Only update UI, but don't actually store the score here
+        // We'll use the controller's score handling for that
+        console.log(`Solitaire: Player ${playerId} earned score: ${score}`);
+    }
 }
 
 // Finds the best card for an AI player to play based on strategic priorities
@@ -422,30 +540,72 @@ async function playRoundSolitaire() {
              showNotificationSolitaire("Game Over! No more possible moves.");
              roundOver = true; // End the round if stuck
         }
+        
+        // Update controller state if round is over
+        if (roundOver) {
+            // Handle the fourth player who didn't finish
+            if (finishOrder.length === 3) {
+                // Find the player who didn't finish
+                const lastPlayer = players_solitaire.find(p => !finishOrder.includes(p));
+                if (lastPlayer) {
+                    showNotificationSolitaire(`${formatPlayerName(lastPlayer)} didn't finish and gets a score of 0.`);
+                }
+            }
+            
+            // Notify that the round is over
+            showNotificationSolitaire("Round over! Click Deal to advance to the next round.");
+            
+            // Convert our score object to the array format expected by the controller
+            const finalScores = getScoresArray();
+            
+            // Fix: Explicitly use the controller's score update method
+            console.log("Solitaire: Sending final scores to controller:", finalScores);
+            controllerUpdateState({
+                roundOver: true,
+                trickInProgress: false,
+                currentRoundScore: finalScores
+            });
+        }
     } // End while loop
 
     console.log("Solitaire: Round loop finished.");
-    calculateScoresSolitaire();
+    
+    // Return the scores for the controller
+    return getScoresArray();
 }
 
+// Fix: Update function to handle scores correctly
+function getScoresArray() {
+    // Convert our player-indexed scores to the array format expected by the controller
+    const scores = [0, 0, 0, 0]; // [player1, player2, player3, player4]
+    
+    // Log current finish order for debugging
+    console.log("Solitaire: Current finish order:", finishOrder);
+    
+    finishOrder.forEach((player, index) => {
+        const playerNum = parseInt(player.replace('player', '')) - 1;
+        const scoreValue = getPlayerScoreForFinishPosition(index);
+        scores[playerNum] = scoreValue;
+        console.log(`Solitaire: ${player} (index ${playerNum}) gets score ${scoreValue}`);
+    });
+    
+    // Find the player who didn't finish and assign them a score of 0
+    if (finishOrder.length === 3) {
+        const missingPlayer = players_solitaire.find(p => !finishOrder.includes(p));
+        if (missingPlayer) {
+            const playerNum = parseInt(missingPlayer.replace('player', '')) - 1;
+            scores[playerNum] = 0;
+            console.log(`Solitaire: ${missingPlayer} (index ${playerNum}) didn't finish, gets score 0`);
+        }
+    }
+    
+    console.log("Solitaire: Final scores array:", scores);
+    return scores;
+}
 
 function checkRoundOverSolitaire() {
     // Check if 3 players have finished
     return finishOrder.length >= 3;
-}
-
-function calculateScoresSolitaire() {
-    let scores = { player1: 0, player2: 0, player3: 0, player4: 0 }; // Use object for clarity
-    // Assign scores based on finish order
-    if (finishOrder.length > 0) scores[finishOrder[0]] = -5;
-    if (finishOrder.length > 1) scores[finishOrder[1]] = -3;
-    if (finishOrder.length > 2) scores[finishOrder[2]] = -1;
-    // The player left retains a score of 0
-
-    console.log("Solitaire: Final Round Scores:", scores);
-    showNotificationSolitaire(`Round Scores: Player 1=${scores.player1}, Player 2=${scores.player2}, Player 3=${scores.player3}, Player 4=${scores.player4}`);
-    // In a real game, these scores would be returned or sent to the controller
-    return scores;
 }
 
 function showNotificationSolitaire(message) {
@@ -620,27 +780,6 @@ function waitForHumanJackOfSpades() {
         humanPlayResolver = resolve;
         console.log("Solitaire: Waiting for human to play Jack of Spades...");
     });
-}
-
-// --- Initialization for Test HTML ---
-// Exported function to be called by the test HTML page
-export function startGameSolitaire(uiElements) {
-    console.log("Solitaire: startGameSolitaire called");
-    // Cache UI elements passed from HTML
-    uiHands.player1 = uiElements.p1Hand;
-    uiHands.player2 = uiElements.p2Hand;
-    uiHands.player3 = uiElements.p3Hand;
-    uiHands.player4 = uiElements.p4Hand;
-    uiBoard = uiElements.board;
-    uiNotifications = uiElements.notifications;
-
-    if (!uiHands.player1 || !uiBoard || !uiNotifications) {
-        console.error("Solitaire: Missing required UI elements!");
-        return;
-    }
-
-    dealCardsSolitaire();
-    playRoundSolitaire(); // Start the game loop
 }
 
 console.log("solitaire.js module loaded");

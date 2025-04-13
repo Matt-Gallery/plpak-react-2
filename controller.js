@@ -1,12 +1,13 @@
 // controller.js - ES6 Module Version
 
 // --- Constants --- 
-const gameRounds = ['tricks', 'hearts', 'queens', 'king'];
+const gameRounds = ['tricks', 'hearts', 'queens', 'king', 'solitaire'];
 const roundTitles = {
     tricks: "No Tricks!",
     hearts: "No Hearts!",
     queens: "No Queens!",
-    king: "No King of Hearts!"
+    king: "No King of Hearts!",
+    solitaire: "Solitaire Round"
 };
 const players = ["player1", "player2", "player3", "player4"]; // Needed globally for now
 const winnerStyle = { player1: "Player 1", player2: "Player 2", player3: "Player 3", player4: "Player 4" };
