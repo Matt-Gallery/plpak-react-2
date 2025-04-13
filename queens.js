@@ -22,81 +22,97 @@ let controllerDelay = () => {};
 let controllerActiveGameRef = {};
 
 // --- Module-Specific State ---
-let roundScore = [0, 0, 0, 0];
-let currentStarter = "player2";
-let roundOver = false;
-let isFirstTrick = true;
-let humanPlayerTurn = false;
-let humanCardSelectionResolver = null;
+let roundScore_queens = [0, 0, 0, 0];
+let currentStarter_queens = null; // Will be set from controller
+let roundOver_queens = false;
+let isFirstTrick_queens = true;
+let humanPlayerTurn_queens = false;
+let humanCardSelectionResolver_queens = null;
 let totalQueensPlayed = 0;
 let queensRoundStarted = false;
-let trickInProgress = false;
+let trickInProgress_queens = false;
+
+// Helper function to format player names
+function formatPlayerName(playerId) {
+    if (playerId === 'player1') return 'Human';
+    return `Player ${playerId.replace('player', '')}`;
+}
 
 // --- Initialization Function (Called by Controller via activeGame.init) ---
-function initRound() {
-  console.log("Queens.js: initRound called.");
-  if (queensRoundStarted) {
-      console.log("Queens.js: initRound called but already started.");
-      return; // Prevent re-init within same page load?
-  }
-  queensRoundStarted = true;
-  roundOver = false;
-  isFirstTrick = true;
-  trickInProgress = false;
-  totalQueensPlayed = 0;
-  humanPlayerTurn = false;
-  humanCardSelectionResolver = null;
-  roundScore = [0, 0, 0, 0];
-  currentStarter = "player2"; // Confirm starting player rule for Queens round
-  controllerActiveGameRef.updateStarter(currentStarter);
+function initQueensRound() {
+    console.log("Queens.js: initQueensRound called.");
+    if (queensRoundStarted) {
+        console.log("Queens.js: Round already started.");
+        return;
+    }
+    queensRoundStarted = true;
+    roundOver_queens = false;
+    trickInProgress_queens = false;
+    isFirstTrick_queens = true;
+    humanPlayerTurn_queens = false;
+    humanCardSelectionResolver_queens = null;
+    roundScore_queens = [0, 0, 0, 0];
+    totalQueensPlayed = 0;
 
-  // Deal cards
-  let shuffledDeck = [...deck_queens];
-  for (let i = shuffledDeck.length - 1; i >= 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
-  }
-  for (let player of players_queens) {
-       if (!playerHands[player]) playerHands[player] = [];
-       playerHands[player] = []; // Clear existing
-  }
-  let cardIndex = 0;
-  while (cardIndex < shuffledDeck.length) {
-      for (let player of players_queens) {
-          if (!playerHands[player]) playerHands[player] = [];
-          if (cardIndex < shuffledDeck.length && playerHands[player].length < 8) {
-              playerHands[player].push(shuffledDeck[cardIndex]);
-              cardIndex++;
-          }
-      }
-  }
+    // Get the starting player from the controller
+    currentStarter_queens = controllerActiveGameRef.currentStarter;
+    console.log(`Queens.js: Using starting player from controller: ${currentStarter_queens}`);
+    
+    // Confirm the starter with the controller
+    controllerActiveGameRef.updateStarter(currentStarter_queens);
 
-  renderHands();
-  clearBoard();
-  controllerShowNotification(`Queens Round Started!`);
-  // Update controller state: round is ready, waiting for first "Next Trick"
-  controllerUpdateState({ gameStarted: true, roundOver: false, trickInProgress: false });
-  console.log("Queens.js: Round initialized and dealt. Waiting for 'Next Trick' click.");
+    // Deal cards
+    let shuffledDeck = [...deck_queens];
+    for (let i = shuffledDeck.length - 1; i >= 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
+    }
+    for (let player of players_queens) {
+         if (!playerHands[player]) playerHands[player] = [];
+         playerHands[player] = []; // Clear existing
+    }
+    let cardIndex = 0;
+    while (cardIndex < shuffledDeck.length) {
+        for (let player of players_queens) {
+            if (!playerHands[player]) playerHands[player] = [];
+            if (cardIndex < shuffledDeck.length && playerHands[player].length < 8) {
+                playerHands[player].push(shuffledDeck[cardIndex]);
+                cardIndex++;
+            }
+        }
+    }
+
+    renderHands();
+    clearBoard();
+    controllerShowNotification(`Queens Round Started! ${formatPlayerName(currentStarter_queens)} starts.`);
+
+    // Update controller state
+    console.log("Queens.js: Round initialized, updating controller state.");
+    controllerUpdateState({
+        gameStarted: true,
+        roundOver: false,
+        trickInProgress: false // Controller will now handle auto-starting first trick
+    });
 }
 
 // --- Game Logic Functions ---
 // Called by Controller via activeGame.startTrick
 async function startTrick(startingPlayer) {
   console.log(`Queens.js: Starting trick, leader: ${startingPlayer}`);
-  if (roundOver || trickInProgress) {
-      console.warn(`Queens.js: startTrick called unexpectedly (roundOver=${roundOver}, trickInProgress=${trickInProgress})`);
-      controllerUpdateState({ trickInProgress: false, roundOver: roundOver });
+  if (roundOver_queens || trickInProgress_queens) {
+      console.warn(`Queens.js: startTrick called unexpectedly (roundOver=${roundOver_queens}, trickInProgress=${trickInProgress_queens})`);
+      controllerUpdateState({ trickInProgress: false, roundOver: roundOver_queens });
       return;
   }
 
-  trickInProgress = true; // Mark trick as running *within this module*
+  trickInProgress_queens = true; // Mark trick as running *within this module*
   inPlay = [];
   players_queens.forEach((player) => {
       if (uiElements.playAreas && uiElements.playAreas[player]) {
           uiElements.playAreas[player].innerHTML = "";
       } else { console.error(`UI element playAreas[${player}] not found!`); }
   });
-  humanPlayerTurn = false;
+  humanPlayerTurn_queens = false;
   let turnOrder = getNextPlayers(startingPlayer);
   console.log(`Queens.js: Turn order: ${turnOrder.join(', ')}`);
 
@@ -104,7 +120,7 @@ async function startTrick(startingPlayer) {
       for (let i = 0; i < turnOrder.length; i++) {
           let player = turnOrder[i];
           console.log(`Queens.js: Current turn: ${player}`);
-          if (roundOver) {
+          if (roundOver_queens) {
               console.log(`Queens.js: Round ended mid-trick (player ${player}'s turn).`);
               break;
           }
@@ -112,10 +128,10 @@ async function startTrick(startingPlayer) {
           let playedCard = null;
 
           if (player === "player1") {
-              humanPlayerTurn = true;
+              humanPlayerTurn_queens = true;
               console.log("Queens.js: Waiting for human player...");
               playedCard = await waitForPlayer1(leadSuit);
-              humanPlayerTurn = false; // Ensure this is set even if promise rejects? (Handled in finally)
+              humanPlayerTurn_queens = false; // Ensure this is set even if promise rejects? (Handled in finally)
               if (!playedCard) throw new Error("Human player action failed.");
               console.log(`Queens.js: Human played: ${playedCard.value}${playedCard.suit}`);
           } else {
@@ -140,7 +156,7 @@ async function startTrick(startingPlayer) {
 
       // --- Trick Resolution (only if loop completed) ---
       console.log("Queens.js: Trick loop finished. Processing outcome...");
-      if (inPlay.length === 4 && !roundOver) { // Ensure exactly 4 cards and round didn't end prematurely
+      if (inPlay.length === 4 && !roundOver_queens) { // Ensure exactly 4 cards and round didn't end prematurely
           let trickWinner = determineTrickWinner(inPlay);
           let points = determineTrickScore(inPlay); // Score based on Queens
           let queensInTrick = inPlay.filter(c => c.value === 'Q').length;
@@ -149,8 +165,8 @@ async function startTrick(startingPlayer) {
           if (trickWinner) {
               let winnerIndex = players_queens.indexOf(trickWinner);
               if (winnerIndex !== -1 && points > 0) {
-                  roundScore[winnerIndex] += points;
-                  console.log(`Queens.js: Trick winner: ${trickWinner}. Points: ${points}. Round Score: ${roundScore.join(',')}. Total Queens: ${totalQueensPlayed}`);
+                  roundScore_queens[winnerIndex] += points;
+                  console.log(`Queens.js: Trick winner: ${trickWinner}. Points: ${points}. Round Score: ${roundScore_queens.join(',')}. Total Queens: ${totalQueensPlayed}`);
               } else if (winnerIndex !== -1) {
                    console.log(`Queens.js: Trick winner: ${trickWinner}. Points: 0.`);
               } else {
@@ -160,12 +176,12 @@ async function startTrick(startingPlayer) {
                console.log("Queens.js: No trick winner determined.");
           }
 
-          currentStarter = trickWinner || startingPlayer; // Winner leads next
-          controllerActiveGameRef.updateStarter(currentStarter);
-          roundOver = checkRoundOver(playerHands, totalQueensPlayed); // Check if round ends
+          currentStarter_queens = trickWinner || startingPlayer; // Winner leads next
+          controllerActiveGameRef.updateStarter(currentStarter_queens);
+          roundOver_queens = checkRoundOver(playerHands, totalQueensPlayed); // Check if round ends
 
           // Check if round over and determine the notification message
-          if (roundOver) {
+          if (roundOver_queens) {
               console.log("Queens.js: Round Over condition met after trick.");
               if (totalQueensPlayed >= 4) {
                   // Specific message if all queens were played
@@ -176,7 +192,7 @@ async function startTrick(startingPlayer) {
               }
           }
 
-      } else if (roundOver) {
+      } else if (roundOver_queens) {
            console.log("Queens.js: Trick processing skipped as round ended mid-trick.");
       } else {
            console.warn(`Queens.js: Trick ended with ${inPlay.length} cards. Not processing score.`);
@@ -184,19 +200,19 @@ async function startTrick(startingPlayer) {
 
   } catch (error) {
       console.error("Queens.js: Error during trick execution:", error);
-      roundOver = true; // Mark round over on error to prevent getting stuck
+      roundOver_queens = true; // Mark round over on error to prevent getting stuck
   } finally {
       // --- Signal Trick Completion ---
-      isFirstTrick = false; // Whether successful or not, first attempt is done
-      trickInProgress = false; // Mark trick as no longer running *within this module*
+      isFirstTrick_queens = false; // Whether successful or not, first attempt is done
+      trickInProgress_queens = false; // Mark trick as no longer running *within this module*
 
       // Update controller: trick attempt is finished, send final state
-      console.log(`Queens.js: Trick attempt finished. Updating controller state (trickInProgress=false, roundOver=${roundOver}, currentRoundScore=${roundScore.join(',')})`);
+      console.log(`Queens.js: Trick attempt finished. Updating controller state (trickInProgress=false, roundOver=${roundOver_queens}, currentRoundScore=${roundScore_queens.join(',')})`);
       // Send a copy of the score array to prevent mutation issues
       controllerUpdateState({
           trickInProgress: false,
-          roundOver: roundOver,
-          currentRoundScore: [...roundScore]
+          roundOver: roundOver_queens,
+          currentRoundScore: [...roundScore_queens]
       });
   }
 }
@@ -394,7 +410,7 @@ function removeHumanCardListeners() {
 }
 
 function handleHumanClick(event) {
-  if (!humanPlayerTurn || !humanCardSelectionResolver) return;
+  if (!humanPlayerTurn_queens || !humanCardSelectionResolver_queens) return;
   const clickedCardEl = event.target.closest(".card");
   if (!clickedCardEl) return;
 
@@ -418,27 +434,27 @@ function handleHumanClick(event) {
 
   // Valid play
   console.log(`Queens.js: Human selected: ${playedCard.value}${playedCard.suit}`);
-  humanPlayerTurn = false;
+  humanPlayerTurn_queens = false;
   removeHumanCardListeners(); // Prevent further clicks immediately
   if (uiElements.handsEls && uiElements.handsEls.player1) {
       uiElements.handsEls.player1.classList.remove('active-turn');
   }
 
   // Resolve the promise AFTER UI updates
-  humanCardSelectionResolver(playedCard);
-  humanCardSelectionResolver = null; // Clear resolver
+  humanCardSelectionResolver_queens(playedCard);
+  humanCardSelectionResolver_queens = null; // Clear resolver
 }
 
 function waitForPlayer1(leadSuit) {
   console.log(`Queens.js: Waiting for Player 1 (lead: ${leadSuit || 'None'})...`);
   return new Promise((resolve, reject) => { // Add reject
      // Clear any lingering resolver
-     if (humanCardSelectionResolver) {
+     if (humanCardSelectionResolver_queens) {
           console.warn("Queens.js: waitForPlayer1 resolver already active! Clearing.");
           // Potentially reject the old promise if that makes sense?
-          // humanCardSelectionResolver(null); // Or reject(new Error("New turn started"));
+          // humanCardSelectionResolver_queens(null); // Or reject(new Error("New turn started"));
      }
-    humanCardSelectionResolver = resolve;
+    humanCardSelectionResolver_queens = resolve;
     attachHumanCardListeners(); // Ensure listeners are attached
     if (uiElements.handsEls && uiElements.handsEls.player1) {
       uiElements.handsEls.player1.classList.add('active-turn');
@@ -449,7 +465,7 @@ function waitForPlayer1(leadSuit) {
   }).finally(() => {
        console.log("Queens.js: Player 1 promise finished.");
        // Ensure resolver is cleared
-       if (humanCardSelectionResolver) humanCardSelectionResolver = null;
+       if (humanCardSelectionResolver_queens) humanCardSelectionResolver_queens = null;
        // Ensure UI cleanup
        if (uiElements.handsEls && uiElements.handsEls.player1) {
           uiElements.handsEls.player1.classList.remove('active-turn');
@@ -477,17 +493,21 @@ export function register(controllerGameObj, sharedState) {
 
   // Populate the controller's activeGame object
   controllerGameObj.name = 'queens';
-  controllerGameObj.init = initRound;
+  controllerGameObj.init = initQueensRound;
   controllerGameObj.startTrick = startTrick;
 
   console.log("Queens.js module registered successfully.");
   // Reset internal state on registration
   queensRoundStarted = false;
-  roundOver = false;
-  isFirstTrick = true;
-  trickInProgress = false;
+  roundOver_queens = false;
+  isFirstTrick_queens = true;
+  trickInProgress_queens = false;
   totalQueensPlayed = 0;
-  roundScore = [0, 0, 0, 0];
+  roundScore_queens = [0, 0, 0, 0];
+
+  // Get the starting player from controller
+  currentStarter_queens = controllerGameObj.currentStarter;
+  console.log(`Queens.js: Starting player from controller registration: ${currentStarter_queens}`);
 }
 
 console.log("Queens.js module loaded.");

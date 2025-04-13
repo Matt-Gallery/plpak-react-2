@@ -22,33 +22,38 @@ let controllerDelay = () => {};
 let controllerActiveGameRef = {}; // Reference to controller's activeGame object
 
 // --- Module-Specific State ---
-let roundScore = [0, 0, 0, 0];
-let currentStarter = "player2";
-let roundOver = false;
-let isFirstTrick = true;
-let humanPlayerTurn = false;
-let humanCardSelectionResolver = null;
+let roundScore_hearts = [0, 0, 0, 0];
+let currentStarter_hearts = null; // Will be set from controller
+let roundOver_hearts = false;
+let isFirstTrick_hearts = true;
+let humanPlayerTurn_hearts = false;
+let humanCardSelectionResolver_hearts = null;
 let totalHeartsPlayed = 0;
 let heartsRoundStarted = false;
-let trickInProgress = false; // Track if a trick async operation is running
+let trickInProgress_hearts = false; // Track if a trick async operation is running
 
 // --- Initialization Function (Called by Controller via activeGame.init) ---
-function initRound() {
-    console.log("Hearts.js: initRound called.");
+function initHeartsRound() {
+    console.log("Hearts.js: initHeartsRound called.");
     if (heartsRoundStarted) {
-        console.log("Hearts.js: initRound called but already started. Resetting...");
-        // Allow re-initialization if called again?
+        console.log("Hearts.js: Round already started.");
+        return;
     }
     heartsRoundStarted = true;
-    roundOver = false;
-    isFirstTrick = true;
-    trickInProgress = false; // Ensure trick is not marked in progress initially
+    roundOver_hearts = false;
+    trickInProgress_hearts = false;
+    isFirstTrick_hearts = true;
+    humanPlayerTurn_hearts = false;
+    humanCardSelectionResolver_hearts = null;
+    roundScore_hearts = [0, 0, 0, 0];
     totalHeartsPlayed = 0;
-    humanPlayerTurn = false;
-    humanCardSelectionResolver = null;
-    roundScore = [0, 0, 0, 0]; // Reset round-specific score
-    currentStarter = "player2"; // Confirm rule: Does Hearts round always start with P2?
-    controllerActiveGameRef.updateStarter(currentStarter);
+
+    // Get the starting player from the controller
+    currentStarter_hearts = controllerActiveGameRef.currentStarter;
+    console.log(`Hearts.js: Using starting player from controller: ${currentStarter_hearts}`);
+    
+    // Confirm the starter with the controller
+    controllerActiveGameRef.updateStarter(currentStarter_hearts);
 
     // Deal cards (using shared playerHands reference)
     let shuffledDeck = [...deck_hearts];
@@ -78,34 +83,40 @@ function initRound() {
 
     renderHands(); // Update UI based on new playerHands state
     clearBoard();  // Clear visual board
-    controllerShowNotification(`Hearts Round Started!`);
+    controllerShowNotification(`Hearts Round Started! ${formatPlayerName(currentStarter_hearts)} starts.`);
 
     // Update controller state AFTER dealing and BEFORE starting the first trick
     // Mark game as started, round not over, and trick not yet in progress
-    controllerUpdateState({ gameStarted: true, roundOver: false, trickInProgress: false });
+    console.log("Hearts.js: Round initialized, updating controller state.");
+    controllerUpdateState({
+        gameStarted: true,
+        roundOver: false,
+        trickInProgress: false // Controller will now handle auto-starting first trick
+    });
+}
 
-    // --- Do NOT automatically start the first trick here anymore ---
-    // The user should click "Next Trick" to start the first trick
-    // startTrick(currentStarter);
-    console.log("Hearts.js: Round initialized and dealt. Waiting for 'Next Trick' click.");
+// Helper function to format player names
+function formatPlayerName(playerId) {
+    if (playerId === 'player1') return 'Human';
+    return `Player ${playerId.replace('player', '')}`;
 }
 
 // --- Game Logic Functions ---
 // Called by Controller via activeGame.startTrick when "Next Trick" is clicked
 async function startTrick(startingPlayer) {
     console.log(`Hearts.js: Starting trick, leader: ${startingPlayer}`);
-    if (roundOver) {
+    if (roundOver_hearts) {
         console.log("Hearts.js: startTrick called but round is over.");
         // Signal back just in case controller state desynced
         controllerUpdateState({ trickInProgress: false, roundOver: true });
         return;
     }
-     if (trickInProgress) {
+     if (trickInProgress_hearts) {
          console.warn("Hearts.js: startTrick called while another trick is already in progress!");
          return; // Prevent overlapping tricks
      }
 
-    trickInProgress = true; // Mark trick as started within the module
+    trickInProgress_hearts = true; // Mark trick as started within the module
     inPlay = []; // Clear cards from previous trick
     players_hearts.forEach((player) => {
         if (uiElements.playAreas && uiElements.playAreas[player]) {
@@ -114,7 +125,7 @@ async function startTrick(startingPlayer) {
             console.error(`UI element playAreas[${player}] not found during trick start!`);
         }
     });
-    humanPlayerTurn = false;
+    humanPlayerTurn_hearts = false;
 
     let turnOrder = getNextPlayers(startingPlayer);
     console.log(`Hearts.js: Turn order: ${turnOrder.join(', ')}`);
@@ -123,7 +134,7 @@ async function startTrick(startingPlayer) {
         for (let i = 0; i < turnOrder.length; i++) {
             let player = turnOrder[i];
             console.log(`Hearts.js: Current turn: ${player}`);
-            if (roundOver) {
+            if (roundOver_hearts) {
                 console.log(`Hearts.js: Round ended mid-trick (player ${player}'s turn).`);
                 break; // Exit loop if round ended due to score
             }
@@ -131,10 +142,10 @@ async function startTrick(startingPlayer) {
             let playedCard = null;
 
             if (player === "player1") {
-                humanPlayerTurn = true;
+                humanPlayerTurn_hearts = true;
                 console.log("Hearts.js: Waiting for human player...");
                 playedCard = await waitForPlayer1(leadSuit);
-                humanPlayerTurn = false;
+                humanPlayerTurn_hearts = false;
                 if (!playedCard) {
                     console.error("P1 failed to play (Hearts).waitForPlayer1 resolved without a card.");
                     // This indicates a potential issue in waitForPlayer1 or handleHumanClick logic
@@ -169,7 +180,7 @@ async function startTrick(startingPlayer) {
 
         // --- Trick Resolution (only if loop completed naturally) ---
         console.log("Hearts.js: Trick loop finished. Processing outcome...");
-        if (inPlay.length === 4 && !roundOver) {
+        if (inPlay.length === 4 && !roundOver_hearts) {
             let trickWinner = determineTrickWinner(inPlay);
             let points = determineTrickScore(inPlay); // Score based on hearts taken
             totalHeartsPlayed += points;
@@ -177,8 +188,8 @@ async function startTrick(startingPlayer) {
             if (trickWinner) {
                 let winnerIndex = players_hearts.indexOf(trickWinner);
                 if (winnerIndex !== -1) {
-                    roundScore[winnerIndex] += points;
-                    console.log(`Hearts.js: Trick winner: ${trickWinner}. Points: ${points}. Round Score: ${roundScore.join(',')}. Total Hearts: ${totalHeartsPlayed}`);
+                    roundScore_hearts[winnerIndex] += points;
+                    console.log(`Hearts.js: Trick winner: ${trickWinner}. Points: ${points}. Round Score: ${roundScore_hearts.join(',')}. Total Hearts: ${totalHeartsPlayed}`);
                 } else {
                      console.error(`Trick winner ${trickWinner} not found in players array!`);
                 }
@@ -186,12 +197,12 @@ async function startTrick(startingPlayer) {
                  console.log("Hearts.js: No trick winner determined."); // Could happen if determineTrickWinner fails
             }
 
-            currentStarter = trickWinner || startingPlayer; // Winner starts next trick
-            controllerActiveGameRef.updateStarter(currentStarter);
-            roundOver = checkRoundOver(playerHands, totalHeartsPlayed); // Check if round ends
+            currentStarter_hearts = trickWinner || startingPlayer; // Winner starts next trick
+            controllerActiveGameRef.updateStarter(currentStarter_hearts);
+            roundOver_hearts = checkRoundOver(playerHands, totalHeartsPlayed); // Check if round ends
 
             // Check if round over and determine the notification message
-            if (roundOver) {
+            if (roundOver_hearts) {
                 console.log("Hearts.js: Round Over condition met after trick.");
                 if (totalHeartsPlayed >= 8) {
                     // Specific message if all hearts were played
@@ -202,9 +213,9 @@ async function startTrick(startingPlayer) {
                 }
             } else {
                  // Log if trick finished but round continues
-                 console.log(`Hearts.js: Trick complete. Next starter: ${currentStarter}. Waiting for next action.`);
+                 console.log(`Hearts.js: Trick complete. Next starter: ${currentStarter_hearts}. Waiting for next action.`);
             }
-        } else if (roundOver) {
+        } else if (roundOver_hearts) {
              console.log("Hearts.js: Trick processing skipped as round ended mid-trick.");
         } else {
             // This case (inPlay.length !== 4) should ideally not happen if loop completes
@@ -216,19 +227,19 @@ async function startTrick(startingPlayer) {
         // If an error occurred (like player failing to play), we might be in an inconsistent state.
         // Mark the round as over to prevent getting stuck? Or maybe just mark trick failed?
         // For now, let's just ensure we signal the trick attempt is over.
-        roundOver = true; // Mark round over to be safe if trick failed badly
+        roundOver_hearts = true; // Mark round over to be safe if trick failed badly
     } finally {
         // --- Signal Trick Completion (Finally Block) ---
-        isFirstTrick = false;
-        trickInProgress = false;
+        isFirstTrick_hearts = false;
+        trickInProgress_hearts = false;
 
         // Update controller: trick is no longer in progress, update roundOver status,
         // AND send the current accumulated round score for display.
-        console.log(`Hearts.js: Trick attempt finished. Updating controller state (trickInProgress=false, roundOver=${roundOver}, currentRoundScore=${roundScore.join(',')})`);
+        console.log(`Hearts.js: Trick attempt finished. Updating controller state (trickInProgress=false, roundOver=${roundOver_hearts}, currentRoundScore=${roundScore_hearts.join(',')})`);
         controllerUpdateState({ 
             trickInProgress: false, 
-            roundOver: roundOver, 
-            currentRoundScore: roundScore // Send current round score
+            roundOver: roundOver_hearts, 
+            currentRoundScore: roundScore_hearts // Send current round score
         });
     }
 }
@@ -435,7 +446,7 @@ function removeHumanCardListeners() {
 }
 
 function handleHumanClick(event) {
-    if (!humanPlayerTurn || !humanCardSelectionResolver) {
+    if (!humanPlayerTurn_hearts || !humanCardSelectionResolver_hearts) {
         // console.log("Hearts.js: Ignoring click, not human turn or resolver not set.");
         return;
     }
@@ -458,7 +469,7 @@ function handleHumanClick(event) {
         controllerShowNotification(`You must play a ${leadSuit} card!`);
         return; // Wait for valid play
     }
-    if (isFirstTrick && inPlay.length === 0 && playedCard.suit === '♥') {
+    if (isFirstTrick_hearts && inPlay.length === 0 && playedCard.suit === '♥') {
          const onlyHasHearts = playerHands.player1.every(card => card.suit === '♥');
          if (!onlyHasHearts) {
             controllerShowNotification(`You cannot lead Hearts on the first trick!`);
@@ -468,15 +479,15 @@ function handleHumanClick(event) {
 
     // Valid play
     console.log(`Hearts.js: Human selected valid card: ${playedCard.value}${playedCard.suit}`);
-    humanPlayerTurn = false; // Mark turn as logically over
+    humanPlayerTurn_hearts = false; // Mark turn as logically over
     removeHumanCardListeners(); // Prevent further clicks
     if (uiElements.handsEls && uiElements.handsEls.player1) {
         uiElements.handsEls.player1.classList.remove('active-turn'); // Remove highlight
     }
 
     // IMPORTANT: Resolve the promise *after* UI updates/listener removal
-    humanCardSelectionResolver(playedCard);
-    humanCardSelectionResolver = null; // Clear resolver
+    humanCardSelectionResolver_hearts(playedCard);
+    humanCardSelectionResolver_hearts = null; // Clear resolver
 }
 
 
@@ -484,12 +495,12 @@ function waitForPlayer1(leadSuit) {
     console.log(`Hearts.js: Waiting for Player 1 input (lead: ${leadSuit || 'None'})...`);
     return new Promise((resolve, reject) => { // Added reject
       // Ensure previous resolver is cleared if any
-       if (humanCardSelectionResolver) {
+       if (humanCardSelectionResolver_hearts) {
             console.warn("waitForPlayer1 called while a previous resolver was active. Clearing old.");
-            humanCardSelectionResolver = null; // Or potentially reject previous promise?
+            humanCardSelectionResolver_hearts = null; // Or potentially reject previous promise?
        }
 
-      humanCardSelectionResolver = resolve; // Set the resolver for handleHumanClick
+      humanCardSelectionResolver_hearts = resolve; // Set the resolver for handleHumanClick
       attachHumanCardListeners(); // Ensure listeners are active on current cards
       if (uiElements.handsEls && uiElements.handsEls.player1) {
         uiElements.handsEls.player1.classList.add('active-turn'); // Highlight human hand
@@ -501,8 +512,8 @@ function waitForPlayer1(leadSuit) {
          // Clean up happens within handleHumanClick upon valid selection
          console.log("Hearts.js: Player 1 promise finished.");
          // Ensure resolver is cleared if promise finished without a click (e.g., rejected by timeout)
-         if (humanCardSelectionResolver) {
-             humanCardSelectionResolver = null;
+         if (humanCardSelectionResolver_hearts) {
+             humanCardSelectionResolver_hearts = null;
          }
          // Ensure highlight is removed
          if (uiElements.handsEls && uiElements.handsEls.player1) {
@@ -536,17 +547,21 @@ export function register(controllerGameObj, sharedState) {
 
     // Populate the controller's activeGame object
     controllerGameObj.name = 'hearts';
-    controllerGameObj.init = initRound;     // Called by Deal button
+    controllerGameObj.init = initHeartsRound;     // Called by Deal button
     controllerGameObj.startTrick = startTrick; // Called by Next Trick button
 
     console.log("Hearts.js module registered successfully.");
     // Reset internal module state flags upon registration
     heartsRoundStarted = false;
-    roundOver = false;
-    isFirstTrick = true;
-    trickInProgress = false;
+    roundOver_hearts = false;
+    isFirstTrick_hearts = true;
+    trickInProgress_hearts = false;
     totalHeartsPlayed = 0;
-    roundScore = [0, 0, 0, 0];
+    roundScore_hearts = [0, 0, 0, 0];
+
+    // Get the starting player from controller
+    currentStarter_hearts = controllerGameObj.currentStarter;
+    console.log(`Hearts.js: Starting player from controller registration: ${currentStarter_hearts}`);
 }
 
 console.log("Hearts.js module loaded.");

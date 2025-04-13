@@ -22,7 +22,7 @@ const deck_tricks = [
   let controllerActiveGameRef = {}; // Reference to controller's activeGame object
   
   let roundScore_tricks = [0, 0, 0, 0];
-  let currentStarter_tricks = "player2";
+  let currentStarter_tricks = null; // Will be set from controller
   let roundOver_tricks = false;
   let isFirstTrick_tricks = true;
   let humanPlayerTurn_tricks = false;
@@ -44,7 +44,12 @@ const deck_tricks = [
       humanPlayerTurn_tricks = false;
       humanCardSelectionResolver_tricks = null;
       roundScore_tricks = [0, 0, 0, 0];
-      currentStarter_tricks = "player2";
+      
+      // Get the starting player from the controller
+      currentStarter_tricks = controllerActiveGameRef.currentStarter;
+      console.log(`Tricks.js: Using starting player from controller: ${currentStarter_tricks}`);
+      
+      // Confirm the starter with the controller
       controllerActiveGameRef.updateStarter(currentStarter_tricks);
   
       // Deal cards
@@ -71,7 +76,7 @@ const deck_tricks = [
   
       renderHands_tricks();
       clearBoard_tricks();
-      controllerShowNotification(`Tricks Round Started!`);
+      controllerShowNotification(`Tricks Round Started! ${formatPlayerName(currentStarter_tricks)} starts.`);
   
       // --- CHANGE: Auto-start logic ---
       // Update controller state: round started AND first trick is starting NOW
@@ -80,6 +85,12 @@ const deck_tricks = [
   
       // Start the first trick automatically
       startTrick_tricks(currentStarter_tricks); // <<< UNCOMMENTED this line
+  }
+  
+  // Helper function to format player names
+  function formatPlayerName(playerId) {
+      if (playerId === 'player1') return 'Human';
+      return `Player ${playerId.replace('player', '')}`;
   }
   
   // --- Game Logic Functions (using shared state/UI refs) ---
@@ -394,14 +405,14 @@ const deck_tricks = [
       controllerGameObj.name = 'tricks';
       controllerGameObj.init = initTricksRound;
       controllerGameObj.startTrick = startTrick_tricks;
+      
+      // Get the starting player from controller
+      currentStarter_tricks = controllerGameObj.currentStarter;
+      console.log(`Tricks.js: Starting player from controller registration: ${currentStarter_tricks}`);
   
       console.log("Tricks.js module registered.");
       // Reset internal state on registration
       tricksRoundStarted = false;
-      roundOver_tricks = false;
-      isFirstTrick_tricks = true;
-      trickInProgress = false;
-      roundScore_tricks = [0, 0, 0, 0];
   }
   
   console.log("Tricks.js module loaded.");

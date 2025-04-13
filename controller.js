@@ -12,6 +12,16 @@ const roundTitles = {
 const players = ["player1", "player2", "player3", "player4"]; // Needed globally for now
 const winnerStyle = { player1: "Player 1", player2: "Player 2", player3: "Player 3", player4: "Player 4" };
 
+// --- Game Cycle Management ---
+// Define 4 cycles with different starting players
+const gameCycles = [
+    { startingPlayer: "player2", cycleCompleted: false },
+    { startingPlayer: "player3", cycleCompleted: false },
+    { startingPlayer: "player4", cycleCompleted: false },
+    { startingPlayer: "player1", cycleCompleted: false }
+];
+let currentCycleIndex = 0; // Track which cycle we're in
+
 // --- Shared State & Interface for Active Game --- 
 // Keep state in controller, pass refs/callbacks to modules
 let playerHands = { player1: [], player2: [], player3: [], player4: [] };
@@ -28,7 +38,7 @@ let activeGame = {
     startTrick: () => { console.error("No game startTrick function loaded!"); },
     // No longer need checkRoundOver here, controller reads internal module state via updateGameState
     updateStarter: (starter) => { activeGame.currentStarter = starter; },
-    currentStarter: "player2"
+    currentStarter: "player2" // Will be set based on current cycle
 };
 
 // --- Cached UI Elements --- 
@@ -40,7 +50,8 @@ let roundTitleEl, dealButton, nextButton, scoreboardEls, playAreas, handsEls, no
     const urlParams = new URLSearchParams(window.location.search);
     const isAdvancing = urlParams.get('advancing') === 'true';
     const existingIndex = localStorage.getItem('plpakRoundIndex');
-    console.log(`Controller: isAdvancing=${isAdvancing}, existingIndex=${existingIndex}`);
+    const existingCycleIndex = localStorage.getItem('plpakCycleIndex') || '0';
+    console.log(`Controller: isAdvancing=${isAdvancing}, existingIndex=${existingIndex}, existingCycleIndex=${existingCycleIndex}`);
 
     if (!isAdvancing && existingIndex !== null && existingIndex !== '0') {
         console.log("Controller: Resetting sequence due to refresh/non-zero index.");
@@ -52,23 +63,36 @@ let roundTitleEl, dealButton, nextButton, scoreboardEls, playAreas, handsEls, no
         console.log("Controller: Very first load or index is already 0. No reset needed.");
         if (existingIndex === null) {
              localStorage.setItem('plpakRoundIndex', '0');
-             console.log("Controller: Set initial round index to 0.");
+             localStorage.setItem('plpakCycleIndex', '0');
+             console.log("Controller: Set initial round index to 0 and cycle index to 0.");
         }
     }
+    
+    // Set current cycle index based on localStorage
+    currentCycleIndex = parseInt(localStorage.getItem('plpakCycleIndex') || '0');
+    // Set active game starter based on current cycle
+    activeGame.currentStarter = gameCycles[currentCycleIndex].startingPlayer;
+    
     const finalIndex = localStorage.getItem('plpakRoundIndex') || '0';
-    console.log(`Controller: checkLoadType finished. Final index in localStorage: ${finalIndex}`);
+    console.log(`Controller: checkLoadType finished. Final index in localStorage: ${finalIndex}, Current cycle: ${currentCycleIndex}`);
 })(); 
 
 // --- Core Controller Functions ---
 
 function getCurrentRoundName() {
     const roundIndex = parseInt(localStorage.getItem('plpakRoundIndex') || '0');
-    return gameRounds[roundIndex] || null; 
+    return gameRounds[roundIndex % gameRounds.length] || null; 
 }
 
 function getCurrentRoundTitle() {
     const roundName = getCurrentRoundName();
-    return roundName ? roundTitles[roundName] : "Game Over";
+    const cycleIndex = parseInt(localStorage.getItem('plpakCycleIndex') || '0');
+    const startingPlayer = gameCycles[cycleIndex].startingPlayer.replace('player', '');
+    
+    if (!roundName) return "Game Over";
+    
+    // Add cycle/player info to the title
+    return `${roundTitles[roundName]} (Cycle ${cycleIndex + 1}, P${startingPlayer} starts)`;
 }
 
 function advanceToNextRound() {
@@ -86,22 +110,49 @@ function advanceToNextRound() {
 
     // Save the UPDATED total scores
     localStorage.setItem('plpakTotalScores', JSON.stringify(totalScores));
+    
+    // Check if we need to advance to the next cycle
+    if (currentIndex % gameRounds.length === 0 && currentIndex > 0) {
+        // Mark current cycle as completed
+        gameCycles[currentCycleIndex].cycleCompleted = true;
+        
+        // Advance to next cycle
+        currentCycleIndex++;
+        localStorage.setItem('plpakCycleIndex', currentCycleIndex.toString());
+        console.log(`Controller: Advanced to cycle ${currentCycleIndex}`);
+        
+        // Update starter based on new cycle
+        if (currentCycleIndex < gameCycles.length) {
+            activeGame.currentStarter = gameCycles[currentCycleIndex].startingPlayer;
+            console.log(`Controller: New starting player: ${activeGame.currentStarter}`);
+        }
+    }
+    
     localStorage.setItem('plpakRoundIndex', currentIndex.toString());
     console.log(`Controller: Set round index to ${currentIndex}.`);
-    if (currentIndex >= gameRounds.length) {
-        console.log("Controller: All rounds completed. Reloading for Game Over state.");
+    
+    // Check if all cycles are completed
+    if (currentCycleIndex >= gameCycles.length) {
+        console.log("Controller: All cycles completed. Reloading for Game Over state.");
     } else {
-        console.log(`Controller: Reloading for round ${gameRounds[currentIndex]}`);
+        console.log(`Controller: Reloading for round ${currentIndex % gameRounds.length} in cycle ${currentCycleIndex}`);
     }
+    
     window.location.href = window.location.pathname + '?advancing=true'; 
 }
 
 function resetGameSequence() {
-    console.log("Controller: RESETTING sequence to index 0.");
+    console.log("Controller: RESETTING sequence to index 0, cycle 0.");
     localStorage.setItem('plpakRoundIndex', '0');
+    localStorage.setItem('plpakCycleIndex', '0');
     localStorage.setItem('plpakTotalScores', JSON.stringify([0, 0, 0, 0]));
     totalScores = [0, 0, 0, 0];
     currentRoundScore = [0, 0, 0, 0]; // Reset current round score too
+    currentCycleIndex = 0;
+    // Reset cycle completion status
+    gameCycles.forEach(cycle => cycle.cycleCompleted = false);
+    // Set starter based on first cycle
+    activeGame.currentStarter = gameCycles[currentCycleIndex].startingPlayer;
 }
 
 function getTotalScores() {
@@ -347,7 +398,7 @@ function handleNextTrickClick() {
 }
 
 // --- Initial Log --- 
-console.log(`Controller initialized. Current round from storage: ${getCurrentRoundName()}`); 
+console.log(`Controller initialized. Current round from storage: ${getCurrentRoundName()}, Cycle: ${currentCycleIndex}`); 
 
 // --- Function Called by Loaded Game Script --- 
 function registerRound(gameName, functions) {
@@ -359,12 +410,11 @@ function registerRound(gameName, functions) {
         activeGame.name = gameName;
         activeGame.init = functions.init; // Assign the init function
         activeGame.startTrick = functions.startTrick;
-        // activeGame.isRoundOver = functions.isRoundOver; // Removed this pattern
+        // Set starting player based on current cycle
+        activeGame.currentStarter = gameCycles[currentCycleIndex].startingPlayer;
         activeGame.updateStarter = functions.updateStarter || activeGame.updateStarter; 
-        activeGame.currentStarter = functions.currentStarter || activeGame.currentStarter;
         
-        // Log the activeGame object AFTER assignment
-        console.log(`Controller: activeGame object updated for '${gameName}': init function name: ${activeGame.init ? activeGame.init.name : 'N/A'}`);
+        console.log(`Controller: activeGame object updated for '${gameName}': init function name: ${activeGame.init ? activeGame.init.name : 'N/A'}, starter: ${activeGame.currentStarter}`);
         
         // Reset controller flags for the new round
         gameStarted = false;

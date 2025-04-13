@@ -29,6 +29,7 @@ let controllerUpdateState; // Function to update controller state
 let controllerUpdateTotalScores; // Function to update total scores
 let controllerShowNotification; // Function to show notifications
 let controllerDelay; // Function for delays
+let controllerActiveGameRef; // Reference to controller's activeGame object
 
 // --- Cached UI Elements ---
 let uiHands = {};
@@ -45,6 +46,7 @@ export function register(activeGame, controllerState) {
     controllerUpdateTotalScores = controllerState.updateTotalScores;
     controllerShowNotification = controllerState.showNotification;
     controllerDelay = controllerState.delay;
+    controllerActiveGameRef = activeGame;
     
     // Cache UI elements
     uiHands.player1 = controllerState.uiElements.handsEls.player1;
@@ -105,12 +107,24 @@ function initSolitaireRound() {
     controllerUpdateState({
         gameStarted: true,
         roundOver: false,
-        trickInProgress: true, // Mark as in progress to disable Next button
-        currentRoundScore: [0, 0, 0, 0]
+        trickInProgress: true // Mark as in progress to disable Next button
     });
+    
+    // Note: While other rounds use the starting player from the cycle,
+    // Solitaire must start with the player who has the Jack of Spades
+    // We'll inform the user about this special rule
     
     // Deal cards and start the game
     dealCardsSolitaire();
+    
+    // Find player with Jack of Spades
+    const jackPlayer = findJackOfSpadesPlayer();
+    if (jackPlayer) {
+        showNotificationSolitaire(`Solitaire Round: ${formatPlayerName(jackPlayer)} has the Jack of Spades and starts.`);
+    } else {
+        showNotificationSolitaire("Error: Jack of Spades not found! Cannot start round.");
+    }
+    
     playRoundSolitaire();
 }
 
@@ -434,8 +448,8 @@ function findAIPlay(player) {
 
 // Helper function to format player IDs for display
 function formatPlayerName(playerId) {
-    const playerNum = playerId.replace('player', '');
-    return `Player ${playerNum}`;
+    if (playerId === 'player1') return 'Human';
+    return `Player ${playerId.replace('player', '')}`;
 }
 
 // Handles a single turn for any player
