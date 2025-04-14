@@ -10,7 +10,7 @@ const deck_king = [
 const cardStyle_king = { "♥": "hearts", "♦": "diamonds", "♣": "clubs", "♠": "spades" };
 const cardRanks_king = { 7: 1, 8: 2, 9: 3, 10: 4, J: 5, Q: 6, K: 7, A: 8 };
 const players_king = ["player1", "player2", "player3", "player4"];
-const KING_OF_HEARTS_PENALTY = 16; // Points for taking the King of Hearts
+const KING_OF_HEARTS_PENALTY = 8; // Points for taking the King of Hearts
 
 // --- Module State (References to Controller State/Functions) ---
 let playerHands = {};
@@ -32,6 +32,8 @@ let humanCardSelectionResolver_king = null;
 let kingRoundStarted = false;
 let trickInProgress_king = false;
 let kingOfHeartsPlayed = false;
+// Track king discard opportunities for each player
+let kingDiscardOpportunities = { player1: 0, player2: 0, player3: 0, player4: 0 };
 
 // Helper function to format player names
 function formatPlayerName(playerId) {
@@ -54,6 +56,8 @@ function initKingRound() {
     humanCardSelectionResolver_king = null;
     roundScore_king = [0, 0, 0, 0];
     kingOfHeartsPlayed = false;
+    // Reset king discard opportunities
+    kingDiscardOpportunities = { player1: 0, player2: 0, player3: 0, player4: 0 };
 
     // Get the starting player from the controller
     currentStarter_king = controllerActiveGameRef.currentStarter;
@@ -340,20 +344,87 @@ function selectCard_AI(player, leadSuit, starter, isFirstTrick) {
       }
       // --- End First Trick Restriction --- 
       
-      // Original Discard Logic (applies after first trick, or if only hearts held on first trick)
-      // Discard King of Hearts first if possible
+      // If this player has the King of Hearts, increment their discard opportunity counter
       if (kingOfHearts) {
-          console.log(`King.js AI (${player}): Discarding King of Hearts.`);
+          kingDiscardOpportunities[player] += 1;
+          console.log(`King.js AI (${player}): Discard opportunity ${kingDiscardOpportunities[player]} for King of Hearts`);
+      }
+      
+      // Check who is currently winning the trick
+      let currentWinner = null;
+      let lowestScorePlayer = null;
+      let lowestScore = Infinity;
+      
+      if (inPlay.length > 0) {
+          // Determine who's currently winning the trick
+          const leadSuitCards = inPlay.filter(card => card.suit === inPlay[0].suit);
+          if (leadSuitCards.length > 0) {
+              const winningCard = leadSuitCards.reduce((highest, card) => 
+                  cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
+              currentWinner = winningCard.player;
+          } else {
+              currentWinner = inPlay[0].player;
+          }
+          
+          // Determine which player has the lowest score
+          roundScore_king.forEach((score, index) => {
+              if (score < lowestScore) {
+                  lowestScore = score;
+                  lowestScorePlayer = players_king[index];
+              }
+          });
+          
+          console.log(`King.js AI: Current trick winner is ${currentWinner}, lowest score player is ${lowestScorePlayer}`);
+      }
+      
+      // Calculate if we should play the King of Hearts
+      const shouldPlayKing = 
+          // Play if current winner has lowest score
+          (currentWinner && lowestScorePlayer && currentWinner === lowestScorePlayer) || 
+          // Or if it's the only heart and we have no other options
+          (kingOfHearts && playerCards.length === 1) ||
+          // Or if this is at least the 3rd opportunity to discard it
+          (kingOfHearts && kingDiscardOpportunities[player] >= 3);
+      
+      // Original Discard Logic with new conditions
+      // Discard King of Hearts if appropriate
+      if (kingOfHearts && shouldPlayKing) {
+          if (kingDiscardOpportunities[player] >= 3) {
+              console.log(`King.js AI (${player}): Discarding King of Hearts - 3rd opportunity, can't wait longer.`);
+          } else if (currentWinner === lowestScorePlayer) {
+              console.log(`King.js AI (${player}): Discarding King of Hearts - winner has lowest score.`);
+          } else {
+              console.log(`King.js AI (${player}): Discarding King of Hearts - last card option.`);
+          }
           return kingOfHearts;
+      } else if (kingOfHearts) {
+          console.log(`King.js AI (${player}): HOLDING King of Hearts - waiting for better opportunity (${kingDiscardOpportunities[player]}/3).`);
+          // Skip directly to other discard options
       }
-      // Then discard highest other heart
-      if (heartsInHand.length > 0) { // heartsInHand here implies nonKingHearts if K wasn't played
-          console.log(`King.js AI (${player}): Discarding highest non-King heart.`);
-          return heartsInHand.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
+      
+      // If not playing King, first try to discard highest other heart
+      if (heartsInHand.length > 0) {
+          // Filter out King of Hearts if we're not playing it this time
+          const discardableHearts = kingOfHearts && !shouldPlayKing ? 
+              heartsInHand.filter(c => !(c.value === 'K' && c.suit === '♥')) : 
+              heartsInHand;
+              
+          if (discardableHearts.length > 0) {
+              console.log(`King.js AI (${player}): Discarding highest non-King heart.`);
+              return discardableHearts.reduce((highest, card) => 
+                  cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
+          }
       }
-      // Otherwise, discard highest card overall (should only happen if only non-hearts were available on first trick and this logic is reached)
-      console.log(`King.js AI (${player}): Discarding highest overall card.`);
-      return playerCards.reduce((highest, card) => cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
+      
+      // If no discardable hearts, filter out King of Hearts from discard options when not appropriate
+      const safeDiscard = kingOfHearts && !shouldPlayKing ? 
+          playerCards.filter(c => !(c.value === 'K' && c.suit === '♥')) : 
+          playerCards;
+          
+      // Discard highest card other than King of Hearts
+      console.log(`King.js AI (${player}): Discarding highest safe card.`);
+      return safeDiscard.reduce((highest, card) => 
+          cardRanks_king[card.value] > cardRanks_king[highest.value] ? card : highest);
   }
   
   // --- Leading a Trick (NOT First Trick) --- 

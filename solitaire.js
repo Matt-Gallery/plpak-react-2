@@ -488,46 +488,97 @@ function findAIPlay(player) {
 
 // Helper function to format player IDs for display
 function formatPlayerName(playerId) {
-    if (playerId === 'player1') return 'Human';
+    if (playerId === 'player1') {
+        // Get the saved player name from localStorage, default to 'Human' if not found
+        const storedName = localStorage.getItem('plpakPlayerName');
+        return storedName || 'Human';
+    }
     return `Player ${playerId.replace('player', '')}`;
 }
 
-// Handles a single turn for any player
-async function handlePlayerTurnSolitaire(player) {
-    console.log(`Solitaire: Turn for ${player}`);
-    let selectedCard = null;
-    showNotificationSolitaire(`${formatPlayerName(player)}'s turn...`);
-
-    // Highlight current player's hand area (optional)
+// Highlights the current player's hand area
+function highlightCurrentPlayer(player) {
     Object.values(uiHands).forEach(el => el.classList.remove('active-turn'));
     if (uiHands[player]) uiHands[player].classList.add('active-turn');
+}
 
-
-    if (player === 'player1') {
-        isHumanTurn = true;
-        attachHumanListeners(); // Make cards clickable if valid
-        selectedCard = await waitForHumanPlay(); // Waits for click or auto-pass
-        isHumanTurn = false;
-        removeHumanListeners();
-        // waitForHumanPlay resolves null if player passes/has no moves
-    } else {
-        // AI Logic
-        await delaySolitaire(1200); // Increased from 800 to 1200
-        selectedCard = findAIPlay(player);
-    }
-
-    if (uiHands[player]) uiHands[player].classList.remove('active-turn'); // Remove highlight
-
+// Handles turn logic for the human player
+async function handleHumanTurnSolitaire(player) {
+    console.log(`Solitaire: Turn for ${player}`);
+    showNotificationSolitaire(`${formatPlayerName(player)}'s turn...`);
+    
+    isHumanTurn = true;
+    attachHumanListeners(); // Make cards clickable if valid
+    const selectedCard = await waitForHumanPlay(); // Waits for click or auto-pass
+    isHumanTurn = false;
+    removeHumanListeners();
+    
+    uiHands[player].classList.remove('active-turn'); // Remove highlight
+    
     if (selectedCard) {
         playCardSolitaire(selectedCard, player);
         showNotificationSolitaire(`${formatPlayerName(player)} played ${selectedCard.value}${selectedCard.suit}.`);
-        await delaySolitaire(750); // Increased from 500 to 750
+        await delaySolitaire(750);
         return true; // Player made a move
     } else {
         console.log(`Solitaire: ${player} has no valid moves and passes.`);
         showNotificationSolitaire(`${formatPlayerName(player)} passes.`);
-        await delaySolitaire(750); // Increased from 500 to 750
+        await delaySolitaire(750);
         return false; // Player passed
+    }
+}
+
+// Handles turn logic for AI players
+async function handleAITurnSolitaire(player) {
+    console.log(`Solitaire: Turn for ${player}`);
+    showNotificationSolitaire(`${formatPlayerName(player)}'s turn...`);
+    
+    await delaySolitaire(1200);
+    const selectedCard = findAIPlay(player);
+    
+    uiHands[player].classList.remove('active-turn'); // Remove highlight
+    
+    if (selectedCard) {
+        playCardSolitaire(selectedCard, player);
+        showNotificationSolitaire(`${formatPlayerName(player)} played ${selectedCard.value}${selectedCard.suit}.`);
+        await delaySolitaire(750);
+        return true; // Player made a move
+    } else {
+        console.log(`Solitaire: ${player} has no valid moves and passes.`);
+        showNotificationSolitaire(`${formatPlayerName(player)} passes.`);
+        await delaySolitaire(750);
+        return false; // Player passed
+    }
+}
+
+// Helper function to get a player's hand
+function getPlayerHandSolitaire(player) {
+    return playerHands[player] || [];
+}
+
+// Handles a single turn for any player
+async function handlePlayerTurnSolitaire(player) {
+    // Skip immediately if player has no cards or has already finished
+    if (getPlayerHandSolitaire(player).length === 0 || finishOrder.includes(player)) {
+        return false;
+    }
+    
+    // Highlight current player
+    highlightCurrentPlayer(player);
+    
+    // Clear notification area if it contains a pass message
+    const notificationElement = document.getElementById('notification-solitaire');
+    if (notificationElement && notificationElement.textContent && notificationElement.textContent.includes('passes')) {
+        notificationElement.textContent = '';
+    }
+    
+    // Handle human player turn
+    if (player === "player1") {
+        return await handleHumanTurnSolitaire(player);
+    } 
+    // Handle AI player turn
+    else {
+        return await handleAITurnSolitaire(player);
     }
 }
 
@@ -553,7 +604,7 @@ async function playRoundSolitaire() {
         // Use the human player turn flow to let them select the Jack
         isHumanTurn = true;
         attachJackOfSpadesOnlyListener(); // Special listener that only allows Jack of Spades
-        let jackOfSpadesCard = await waitForHumanJackOfSpades();
+        await waitForHumanJackOfSpades();
         isHumanTurn = false;
         
         // At this point, they've played the Jack of Spades, which will have updated the board
@@ -565,18 +616,26 @@ async function playRoundSolitaire() {
         await delaySolitaire(1500); // Delay after playing Jack of Spades
     }
 
+    // Player who had Jack of Spades goes first, then we move to the next player
     let playerIndex = players_solitaire.indexOf(starter);
     let consecutivePasses = 0; // To detect stuck game
+    let skippedPlayers = new Set(); // Keep track of skipped players for logging
 
     while (!roundOver) {
-        // Move to next player
-        playerIndex = (playerIndex + 1) % players_solitaire.length;
+        // First check if current player has cards to play
         currentPlayer = players_solitaire[playerIndex];
-
-        // Skip player if they already finished
-        if (finishOrder.includes(currentPlayer)) {
-            console.log(`Solitaire: Skipping finished player ${currentPlayer}`);
-            continue;
+        
+        // Skip player if they already finished - do this without any delay
+        if (getPlayerHandSolitaire(currentPlayer).length === 0 || finishOrder.includes(currentPlayer)) {
+            // Only log if we haven't already logged this player being skipped
+            if (!skippedPlayers.has(currentPlayer)) {
+                console.log(`Solitaire: Skipping finished player ${currentPlayer} for the rest of the game`);
+                skippedPlayers.add(currentPlayer);
+            }
+            
+            // Move to next player and continue
+            playerIndex = (playerIndex + 1) % players_solitaire.length;
+            continue; // Immediately go to the next player with absolutely no delay
         }
 
         let playerMoved = await handlePlayerTurnSolitaire(currentPlayer);
@@ -606,11 +665,7 @@ async function playRoundSolitaire() {
                 }
             }
             
-            // Call the endSolitaireRound function to:
-            // - Display final scores
-            // - Show the Next button again
-            // - Change "Deal" button text to "Next Hand"
-            // - Update controller state
+            // Call the endSolitaireRound function
             endSolitaireRound();
             
             // Log that the round is over
@@ -619,6 +674,9 @@ async function playRoundSolitaire() {
             // Break out of the game loop - round is over
             break;
         }
+        
+        // Move to next player
+        playerIndex = (playerIndex + 1) % players_solitaire.length;
     } // End while loop
 
     console.log("Solitaire: Round loop finished.");
@@ -681,6 +739,10 @@ function showNotificationSolitaire(message) {
                 word-wrap: break-word;
                 text-align: center;
                 box-sizing: border-box;
+                background-color: rgba(0, 0, 0, 0.8);
+                border: 2px solid #ffcc00;
+                border-radius: 10px;
+                box-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
             }
             
             .notifications {
@@ -711,6 +773,20 @@ function showNotificationSolitaire(message) {
             notificationElement.style.minWidth = 'fit-content';
             notificationElement.style.margin = '0 auto';
         }
+        
+        // For Game Complete messages, keep them visible indefinitely (don't auto-hide)
+        if (message.startsWith("Game Complete!")) {
+            console.log("Solitaire: Keeping Game Complete notification visible indefinitely");
+            return; // Don't set timeout to clear
+        }
+        
+        // Auto-clear after delay (for regular notifications)
+        setTimeout(() => {
+            // Only clear if this notification is still the one showing
+            if (uiNotifications.innerHTML.includes(message)) {
+                uiNotifications.innerHTML = "";
+            }
+        }, 5000); // Increased to 5 seconds for better readability
     } else {
         console.log("Notification:", message);
     }
@@ -856,9 +932,21 @@ function handleStartingJackClick(event) {
 
     console.log("Solitaire: Human clicked Jack of Spades to start the game");
     
-    // Play the card and resolve the promise
-    playCardSolitaire(card, 'player1');
+    // Play the card and properly update board state
+    // First remove from hand
+    const jackIndex = playerHands.player1.findIndex(c => c.value === 'J' && c.suit === '♠');
+    if (jackIndex !== -1) {
+        playerHands.player1.splice(jackIndex, 1);
+    }
+    
+    // Update board state
+    const jackRankIndex = cardSequence.indexOf('J');
+    boardStacks['♠'] = { low: jackRankIndex, high: jackRankIndex };
+    
+    // Show notification and re-render the UI
     showNotificationSolitaire(`${formatPlayerName('player1')} starts with J♠.`);
+    renderHandsSolitaire();
+    renderBoardSolitaire();
     
     // Clean up
     uiHands.player1.querySelectorAll('.card').forEach(cardEl => {
@@ -866,6 +954,7 @@ function handleStartingJackClick(event) {
         cardEl.removeEventListener('click', handleStartingJackClick);
     });
     
+    // Resolve the promise
     humanPlayResolver(card);
     humanPlayResolver = null;
 }
@@ -897,7 +986,80 @@ function endSolitaireRound() {
         return `${formatPlayerName(player)}: ${score}`;
     }).join(', ');
     
-    showNotificationSolitaire(`Final scores: ${scoreDisplay}`);
+    // Check if this is the final cycle (cycle 4)
+    const currentCycleIndex = parseInt(localStorage.getItem('plpakCycleIndex') || '0');
+    const isFinalCycle = currentCycleIndex === 3; // Cycles are 0-indexed, so cycle 4 is index 3
+    
+    if (isFinalCycle) {
+        console.log("Solitaire: Final cycle complete! Game Over!");
+        
+        // Use the localStorage flag to signal game completion to the controller
+        localStorage.setItem('plpakGameComplete', 'true');
+        
+        // Get the overall scores to determine the winner
+        const totalScoresStr = localStorage.getItem('plpakTotalScores');
+        if (totalScoresStr) {
+            try {
+                // Parse stored total scores (up to but not including this final round)
+                const storedTotalScores = JSON.parse(totalScoresStr);
+                if (Array.isArray(storedTotalScores) && storedTotalScores.length === 4) {
+                    // Add the current round's scores to get the true final scores
+                    const trueFinaScores = storedTotalScores.map((score, idx) => score + finalScores[idx]);
+                    console.log("Final round scores:", finalScores);
+                    console.log("Stored total scores:", storedTotalScores);
+                    console.log("True final scores:", trueFinaScores);
+                    
+                    // Find the lowest score (winner)
+                    const lowestScore = Math.min(...trueFinaScores);
+                    
+                    // Find all players with the lowest score (in case of a tie)
+                    const winnerIndices = trueFinaScores.map((score, index) => 
+                        score === lowestScore ? index : -1).filter(index => index !== -1);
+                    
+                    // Create winner announcement message
+                    let winnerMessage = "Game Complete! ";
+                    
+                    if (winnerIndices.length === 1) {
+                        // Single winner
+                        const winnerIndex = winnerIndices[0];
+                        const winnerName = winnerIndex === 0 ? formatPlayerName('player1') : `Player ${winnerIndex + 1}`;
+                        winnerMessage += `${winnerName} wins with ${lowestScore} points!`;
+                    } else {
+                        // Tie between multiple players
+                        const winnerNames = winnerIndices.map(index => 
+                            index === 0 ? formatPlayerName('player1') : `Player ${index + 1}`
+                        );
+                        
+                        if (winnerNames.length === 2) {
+                            winnerMessage += `Tie between ${winnerNames[0]} and ${winnerNames[1]} with ${lowestScore} points!`;
+                        } else {
+                            // Format list with proper comma separation and "and" for the last item
+                            const lastWinner = winnerNames.pop();
+                            winnerMessage += `Tie between ${winnerNames.join(', ')} and ${lastWinner} with ${lowestScore} points!`;
+                        }
+                    }
+                    
+                    // Show the game complete notification
+                    showNotificationSolitaire(winnerMessage);
+                    
+                    // Update the round title element
+                    const roundTitleEl = document.querySelector('.round');
+                    if (roundTitleEl) {
+                        roundTitleEl.textContent = "Game Complete!";
+                        roundTitleEl.style.color = "#ffcc00";
+                        roundTitleEl.style.fontWeight = "bold";
+                        roundTitleEl.style.fontSize = "32px";
+                    }
+                }
+            } catch (e) {
+                console.error("Error parsing total scores:", e);
+            }
+        }
+    } else {
+        // Normal round end notification for cycles 1-3
+        showNotificationSolitaire(`Final scores: ${scoreDisplay}`);
+        showNotificationSolitaire("Solitaire Round complete! Click Next Hand.");
+    }
     
     // Restore the Next Round button visibility for next rounds
     const nextButton = document.querySelector('.next');
@@ -911,11 +1073,51 @@ function endSolitaireRound() {
         buttonsContainer.classList.remove('buttons-solitaire-mode');
     }
     
-    // Force button state update to change Deal to Next Hand
+    // Change button text based on whether this is the final cycle
     const dealButton = document.querySelector('.deal');
     if (dealButton) {
-        dealButton.textContent = 'Next Hand';
-        dealButton.disabled = false;
+        if (isFinalCycle) {
+            dealButton.textContent = 'New Game';
+            // Keep standard button styling - no custom styling so it matches the Next Round button
+            
+            // Remove existing event listeners by replacing with a clone
+            const newDealButton = dealButton.cloneNode(true);
+            dealButton.parentNode.replaceChild(newDealButton, dealButton);
+            
+            // Add a new game event listener
+            newDealButton.addEventListener('click', () => {
+                console.log("Solitaire: New Game button clicked, resetting game sequence");
+                
+                // Clear all game state
+                localStorage.setItem('plpakRoundIndex', '0');
+                localStorage.setItem('plpakCycleIndex', '0');
+                localStorage.setItem('plpakTotalScores', JSON.stringify([0, 0, 0, 0]));
+                localStorage.removeItem('plpakGameComplete'); // Clear game complete flag
+                
+                // Reset cycle scores
+                localStorage.setItem('plpakCycleScores', JSON.stringify([
+                    [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]
+                ]));
+                
+                // Also clear any other game state that might persist
+                localStorage.removeItem('plpakGameInProgress');
+                
+                // Force a clean browser reload with no parameters
+                window.location.href = window.location.pathname;
+                
+                // If that doesn't work, try a hard reload
+                setTimeout(() => {
+                    console.log("Forcing hard reload...");
+                    window.location.reload(true);
+                }, 100);
+            });
+            
+            // Make sure the NEW button is enabled
+            newDealButton.disabled = false;
+        } else {
+            dealButton.textContent = 'Next Hand';
+            dealButton.disabled = false;
+        }
     }
     
     // Update controller state with our scores
@@ -925,8 +1127,6 @@ function endSolitaireRound() {
         trickInProgress: false,
         currentRoundScore: finalScores
     });
-    
-    showNotificationSolitaire("Solitaire Round complete! Click Next Hand.");
 }
 
 // TEMPORARY: Expose the endSolitaireRound function globally for the skip button

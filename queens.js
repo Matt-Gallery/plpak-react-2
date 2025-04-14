@@ -31,6 +31,8 @@ let humanCardSelectionResolver_queens = null;
 let totalQueensPlayed = 0;
 let queensRoundStarted = false;
 let trickInProgress_queens = false;
+// Track which queens have been played
+let queensPlayed = { "♥": false, "♦": false, "♣": false, "♠": false };
 
 // Helper function to format player names
 function formatPlayerName(playerId) {
@@ -53,6 +55,8 @@ function initQueensRound() {
     humanCardSelectionResolver_queens = null;
     roundScore_queens = [0, 0, 0, 0];
     totalQueensPlayed = 0;
+    // Reset queens played tracking
+    queensPlayed = { "♥": false, "♦": false, "♣": false, "♠": false };
 
     // Get the starting player from the controller
     currentStarter_queens = controllerActiveGameRef.currentStarter;
@@ -157,6 +161,9 @@ async function startTrick(startingPlayer) {
       // --- Trick Resolution (only if loop completed) ---
       console.log("Queens.js: Trick loop finished. Processing outcome...");
       if (inPlay.length === 4 && !roundOver_queens) { // Ensure exactly 4 cards and round didn't end prematurely
+          // Track queens played in this trick
+          updateQueensPlayed(inPlay);
+          
           let trickWinner = determineTrickWinner(inPlay);
           let points = determineTrickScore(inPlay); // Score based on Queens
           let queensInTrick = inPlay.filter(c => c.value === 'Q').length;
@@ -281,8 +288,7 @@ function playCardToBoard(card, player) {
 }
 
 // --- AI Logic ---
-// AI Strategy: Avoid taking Queens!
-function selectCard_AI(player, leadSuit, currentStarter) { // Added currentStarter
+function selectCard_AI(player, leadSuit, currentStarter) {
   const playerCards = playerHands[player];
   if (!playerCards || playerCards.length === 0) {
       console.error(`AI ${player} has no cards.`);
@@ -290,47 +296,146 @@ function selectCard_AI(player, leadSuit, currentStarter) { // Added currentStart
   }
 
   const isLeading = !leadSuit;
-  const queensInHand = playerCards.filter((card) => card.value === "Q");
-  const hasLeadSuit = leadSuit ? playerCards.some((card) => card.suit === leadSuit) : false;
-  const cardsOfLeadSuit = leadSuit ? playerCards.filter((card) => card.suit === leadSuit) : [];
-  const nonQueensOfLeadSuit = cardsOfLeadSuit.filter(c => c.value !== 'Q');
-
+  const queensInHand = playerCards.filter(card => card.value === "Q");
+  const hasLeadSuit = leadSuit ? playerCards.some(card => card.suit === leadSuit) : false;
+  const cardsOfLeadSuit = leadSuit ? playerCards.filter(card => card.suit === leadSuit) : [];
+  
+  // Count remaining queens in the game
+  const remainingQueens = Object.values(queensPlayed).filter(played => !played).length;
+  console.log(`Queens.js: AI ${player} thinking. ${remainingQueens} queens still unplayed.`);
+  
+  // Check if the lead suit queen has been played
+  const leadSuitQueenPlayed = leadSuit ? queensPlayed[leadSuit] : false;
+  
   // 1. Must follow suit if possible
   if (leadSuit && hasLeadSuit) {
-      // If have non-Queens of lead suit, play the lowest safe one
+      // Get cards of lead suit excluding queens
+      const nonQueensOfLeadSuit = cardsOfLeadSuit.filter(c => c.value !== 'Q');
+      const queenOfLeadSuit = cardsOfLeadSuit.find(c => c.value === 'Q');
+      
+      // If queen of this suit has already been played, we can play more aggressively
+      if (leadSuitQueenPlayed) {
+          console.log(`Queens.js: AI ${player} knows Queen of ${leadSuit} already played, can play high.`);
+          
+          // If playing 4th and no queens left in this suit, can play highest card safely
+          if (inPlay.length === 3 && !inPlay.some(c => c.value === 'Q')) {
+              return cardsOfLeadSuit.reduce((highest, card) => 
+                  cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
+          }
+          
+          // Otherwise still prefer lower cards
+          return cardsOfLeadSuit.reduce((lowest, card) => 
+              cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
+      }
+      
+      // Queen of this suit hasn't been played yet - be cautious
+      // Check if queen is in the trick already
+      const queenInTrick = inPlay.some(c => c.value === 'Q' && c.suit === leadSuit);
+      
+      if (queenInTrick) {
+          // Queen already in this trick, try to avoid winning by playing low card
+          console.log(`Queens.js: AI ${player} sees Queen in trick, avoiding winning.`);
+          return cardsOfLeadSuit.reduce((lowest, card) => 
+              cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
+      }
+      
+      // Queen might still be out there
       if (nonQueensOfLeadSuit.length > 0) {
-           // Simple: Play lowest non-queen of lead suit
-           return nonQueensOfLeadSuit.reduce((lowest, card) => cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
-           // TODO: More advanced: Check if playing highest non-queen is safe (won't win if a Queen is out there?)
+          // Look at cards played so far to estimate if we'll win the trick
+          const highestPlayedCard = inPlay
+              .filter(c => c.suit === leadSuit)
+              .reduce((highest, card) => 
+                  cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest, 
+                  {value: '7', suit: leadSuit});
+          
+          // Find highest safe card (won't win the trick)
+          const safeCards = nonQueensOfLeadSuit.filter(card => 
+              cardRanks_queens[card.value] < cardRanks_queens[highestPlayedCard.value]);
+              
+          if (safeCards.length > 0) {
+              // Play highest card that won't win
+              console.log(`Queens.js: AI ${player} playing safe card below current highest.`);
+              return safeCards.reduce((highest, card) => 
+                  cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
+          }
+          
+          // No safe cards, must win - play lowest to minimize risk
+          console.log(`Queens.js: AI ${player} must win, playing lowest card.`);
+          return nonQueensOfLeadSuit.reduce((lowest, card) => 
+              cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
       }
-      // If only have Queens of lead suit, must play one (play lowest rank Queen)
-      else { // cardsOfLeadSuit contains only Queens
-           return cardsOfLeadSuit.reduce((lowest, card) => cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
-      }
+      
+      // Only have queen of lead suit, must play it
+      console.log(`Queens.js: AI ${player} forced to play Queen of ${leadSuit}.`);
+      return queenOfLeadSuit;
   }
-
+  
   // 2. Cannot follow suit (or leading)
   // A. Leading the trick
   if (isLeading) {
-       // Try to lead with lowest non-Queen card
-       const nonQueens = playerCards.filter(c => c.value !== 'Q');
-       if (nonQueens.length > 0) {
-           return nonQueens.reduce((lowest, card) => cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
-       }
-       // If only Queens left, must lead with one (lowest)
-       return queensInHand.reduce((lowest, card) => cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
-  }
-  // B. Cannot follow suit, discarding
-  else {
-      // Discard highest Queen first (get rid of liability)
-      if (queensInHand.length > 0) {
-          return queensInHand.reduce((highest, card) => cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
+      // Avoid leading suits where the queen hasn't been played
+      const safeSuits = Object.keys(queensPlayed).filter(suit => queensPlayed[suit]);
+      
+      if (safeSuits.length > 0) {
+          // Prioritize cards from suits where queen is already played
+          const safeCards = playerCards.filter(card => safeSuits.includes(card.suit));
+          if (safeCards.length > 0) {
+              console.log(`Queens.js: AI ${player} leading from safe suit (queen already played).`);
+              return safeCards.reduce((lowest, card) => 
+                  cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
+          }
       }
-      // If no Queens, discard highest other card
-      return playerCards.reduce((highest, card) => cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
+      
+      // If no safe suits or no cards of safe suits, use default strategy
+      // Try to lead with lowest non-Queen card
+      const nonQueens = playerCards.filter(c => c.value !== 'Q');
+      if (nonQueens.length > 0) {
+          console.log(`Queens.js: AI ${player} leading with low non-queen.`);
+          return nonQueens.reduce((lowest, card) => 
+              cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
+      }
+      
+      // If only Queens left, must lead with one (lowest)
+      console.log(`Queens.js: AI ${player} forced to lead with a queen.`);
+      return queensInHand.reduce((lowest, card) => 
+          cardRanks_queens[card.value] < cardRanks_queens[lowest.value] ? card : lowest);
   }
+  
+  // B. Cannot follow suit, discarding
+  // Prioritize discarding from suits where the queen has already been played
+  const safeSuits = Object.keys(queensPlayed).filter(suit => queensPlayed[suit]);
+  
+  if (safeSuits.length > 0) {
+      const safeCards = playerCards.filter(card => safeSuits.includes(card.suit));
+      if (safeCards.length > 0) {
+          console.log(`Queens.js: AI ${player} discarding from safe suit (queen already played).`);
+          return safeCards.reduce((highest, card) => 
+              cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
+      }
+  }
+  
+  // Get rid of queens if possible
+  if (queensInHand.length > 0) {
+      console.log(`Queens.js: AI ${player} discarding a queen.`);
+      return queensInHand.reduce((highest, card) => 
+          cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
+  }
+  
+  // Discard highest cards from dangerous suits (where queen hasn't been played)
+  const dangerousSuits = Object.keys(queensPlayed).filter(suit => !queensPlayed[suit]);
+  const dangerousCards = playerCards.filter(card => dangerousSuits.includes(card.suit));
+  
+  if (dangerousCards.length > 0) {
+      console.log(`Queens.js: AI ${player} discarding high card from dangerous suit.`);
+      return dangerousCards.reduce((highest, card) => 
+          cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
+  }
+  
+  // Default: discard highest card
+  console.log(`Queens.js: AI ${player} discarding highest card (fallback).`);
+  return playerCards.reduce((highest, card) => 
+      cardRanks_queens[card.value] > cardRanks_queens[highest.value] ? card : highest);
 }
-
 
 // --- Trick/Round Logic Utilities ---
 function getNextPlayers(startingPlayer) {
@@ -471,6 +576,18 @@ function waitForPlayer1(leadSuit) {
           uiElements.handsEls.player1.classList.remove('active-turn');
        }
        removeHumanCardListeners(); // Ensure listeners are removed
+  });
+}
+
+// Function to track queens played in tricks
+function updateQueensPlayed(trickCards) {
+  if (!trickCards || !Array.isArray(trickCards)) return;
+  
+  trickCards.forEach(card => {
+    if (card.value === "Q") {
+      queensPlayed[card.suit] = true;
+      console.log(`Queens.js: Queen of ${card.suit} has been played.`);
+    }
   });
 }
 

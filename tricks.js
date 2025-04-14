@@ -270,16 +270,80 @@ const deck_tricks = [
   }
   
   function selectCard_Tricks_AI(player, leadSuit, starter, isFirstTrick) {
-       const playerCards = playerHands[player];
-      if (!playerCards || playerCards.length === 0) return null;
-      // Simple AI: Follow suit with lowest, otherwise play lowest overall
-      if (leadSuit) {
-           const cardsOfLeadSuit = playerCards.filter((card) => card.suit === leadSuit);
-           if (cardsOfLeadSuit.length > 0) {
-               return cardsOfLeadSuit.reduce((lowest, card) => cardRanks_tricks[card.value] < cardRanks_tricks[lowest.value] ? card : lowest);
-           }
-      }
-       return playerCards.reduce((lowest, card) => cardRanks_tricks[card.value] < cardRanks_tricks[lowest.value] ? card : lowest);
+    const playerCards = playerHands[player];
+    if (!playerCards || playerCards.length === 0) return null;
+    
+    // Helper function to identify singleton cards (only one card of that suit)
+    const getSingletons = () => {
+        const suitCounts = {};
+        playerCards.forEach(card => {
+            suitCounts[card.suit] = (suitCounts[card.suit] || 0) + 1;
+        });
+        return playerCards.filter(card => suitCounts[card.suit] === 1);
+    };
+
+    // Check if this player is the 4th player in the trick
+    const isFourthPlayer = inPlay.length === 3;
+    
+    // Must follow suit if possible
+    if (leadSuit) {
+        const cardsOfLeadSuit = playerCards.filter(card => card.suit === leadSuit);
+        
+        // 1. If player has cards of the lead suit
+        if (cardsOfLeadSuit.length > 0) {
+            // Find highest card played so far of the lead suit
+            const highestPlayedCard = inPlay
+                .filter(card => card.suit === leadSuit)
+                .reduce((highest, card) => 
+                    cardRanks_tricks[card.value] > cardRanks_tricks[highest.value] ? card : highest, 
+                    {value: '7', suit: leadSuit}); // Default to lowest
+                    
+            // 3. If player has cards lower than highest played, play highest safe card
+            const safeCards = cardsOfLeadSuit.filter(card => 
+                cardRanks_tricks[card.value] < cardRanks_tricks[highestPlayedCard.value]);
+                
+            if (safeCards.length > 0) {
+                // Play highest card that won't win
+                return safeCards.reduce((highest, card) => 
+                    cardRanks_tricks[card.value] > cardRanks_tricks[highest.value] ? card : highest);
+            }
+            
+            // No safe cards - player can't avoid winning
+            // If playing 4th or all cards would win, play highest card of lead suit
+            return cardsOfLeadSuit.reduce((highest, card) => 
+                cardRanks_tricks[card.value] > cardRanks_tricks[highest.value] ? card : highest);
+        }
+        
+        // 2. If player doesn't have cards of the lead suit
+        // Check for singleton 9 or higher
+        const singletons = getSingletons();
+        const highSingletons = singletons.filter(card => cardRanks_tricks[card.value] >= 3); // 9 or higher
+        
+        if (highSingletons.length > 0) {
+            // Play highest singleton
+            return highSingletons.reduce((highest, card) => 
+                cardRanks_tricks[card.value] > cardRanks_tricks[highest.value] ? card : highest);
+        }
+        
+        // No high singleton, play highest card overall
+        return playerCards.reduce((highest, card) => 
+            cardRanks_tricks[card.value] > cardRanks_tricks[highest.value] ? card : highest);
+    }
+    
+    // 4. Leading the trick (no lead suit)
+    // Check for singleton 10 or lower
+    const singletons = getSingletons();
+    const lowSingletons = singletons.filter(card => cardRanks_tricks[card.value] <= 4); // 10 or lower
+    
+    if (lowSingletons.length > 0) {
+        // Lead with lowest singleton 10 or lower
+        return lowSingletons.reduce((lowest, card) => 
+            cardRanks_tricks[card.value] < cardRanks_tricks[lowest.value] ? card : lowest);
+    }
+    
+    // No low singleton, lead with lowest card
+    return playerCards.reduce((lowest, card) => 
+        cardRanks_tricks[card.value] < cardRanks_tricks[lowest.value] ? card : lowest);
   }
   
   function determineTrickWinner_tricks(trickCards) {
