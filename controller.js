@@ -1099,7 +1099,19 @@ window.toggleTooltip = function(event) {
     event.stopPropagation(); // Prevent the event from bubbling up
     const tooltipTextEl = document.querySelector('.tooltiptext');
     if (tooltipTextEl) {
-        tooltipTextEl.classList.toggle('visible');
+        // Special handling for mobile view
+        if (window.innerWidth <= 768) {
+            if (tooltipTextEl.style.visibility === 'visible') {
+                tooltipTextEl.style.visibility = 'hidden';
+                tooltipTextEl.style.opacity = '0';
+            } else {
+                tooltipTextEl.style.visibility = 'visible';
+                tooltipTextEl.style.opacity = '1';
+            }
+        } else {
+            // Desktop behavior
+            tooltipTextEl.classList.toggle('visible');
+        }
     }
 };
 
@@ -1132,4 +1144,65 @@ function updateTooltipText() {
     const specificRules = roundSpecificRules[currentRoundName] || '';
 
     tooltipTextEl.innerHTML = `${generalRules}${specificRules}`;
-} 
+}
+
+// Create responsive mobile scoreboard
+function createMobileScoreboard() {
+    const scoreboard = document.querySelector('.scoreboard');
+    if (!scoreboard) return;
+    
+    // Clear any existing mobile elements
+    const existingMobile = scoreboard.querySelectorAll('.mobile-player');
+    existingMobile.forEach(el => el.remove());
+    
+    // Get player names and totals
+    const playerNames = [];
+    const playerScores = [];
+    
+    // Get saved player name for player 1
+    const savedName = localStorage.getItem('plpakPlayerName') || "Human";
+    playerNames.push(savedName);
+    playerNames.push("Player 2");
+    playerNames.push("Player 3");
+    playerNames.push("Player 4");
+    
+    // Get total scores
+    const baseTotalScores = getTotalScores();
+    const displayTotals = baseTotalScores.map((base, i) => base + (currentRoundScore[i] || 0));
+    
+    // Create mobile player elements
+    playerNames.forEach((name, index) => {
+        const mobilePlayer = document.createElement('div');
+        mobilePlayer.className = 'mobile-player';
+        
+        const playerName = document.createElement('div');
+        playerName.className = 'mobile-player-name';
+        playerName.textContent = name;
+        
+        const playerScore = document.createElement('div');
+        playerScore.className = 'mobile-player-score';
+        playerScore.textContent = displayTotals[index];
+        
+        mobilePlayer.appendChild(playerName);
+        mobilePlayer.appendChild(playerScore);
+        scoreboard.appendChild(mobilePlayer);
+    });
+}
+
+// Call this function after scores are updated
+const originalDisplayScores = displayScores;
+displayScores = function() {
+    originalDisplayScores.apply(this, arguments);
+    
+    // Check if we're in mobile view
+    if (window.innerWidth <= 768) {
+        createMobileScoreboard();
+    }
+};
+
+// Also call on resize
+window.addEventListener('resize', function() {
+    if (window.innerWidth <= 768) {
+        createMobileScoreboard();
+    }
+}); 

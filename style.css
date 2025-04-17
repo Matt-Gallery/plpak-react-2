@@ -34,7 +34,7 @@ h1 {
   margin-right: 0;
   width: 170px;
   position: absolute;
-  left: 0;
+  left: -5px;
   top: 50%;
   transform: translateY(-50%) rotate(90deg);
   z-index: 6;
@@ -46,7 +46,7 @@ h1 {
   margin-left: 0;
   width: 170px;
   position: absolute;
-  right: 0;
+  right: -5px;
   top: 50%;
   transform: translateY(-50%) rotate(90deg);
   z-index: 6;
@@ -512,8 +512,53 @@ i {
     top: 0;
     right: 0;
     width: auto;
-    max-width: 95%;
+    max-width: 320px;
     margin: 0 auto 10px auto;
+    display: flex;
+    flex-direction: row;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 5px;
+    border-radius: 5px;
+    justify-content: space-around;
+  }
+  
+  .scoreboard:before {
+    content: "";
+    display: none;
+  }
+  
+  .scoreboard:after {
+    content: "";
+    display: flex;
+    width: 100%;
+    justify-content: space-around;
+  }
+  
+  .mobile-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    margin: 0 5px;
+  }
+  
+  .mobile-player-name {
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 3px;
+  }
+  
+  .mobile-player-score {
+    background-color: rgb(255, 240, 175);
+    border: 2px solid #000;
+    width: 35px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 15px;
   }
   
   .score-name {
@@ -536,8 +581,14 @@ i {
     height: 300px;
   }
   
-  .hand-2, .hand-4 {
-    width: 120px;
+  .hand-2 {
+    left: -75px !important;
+    width: 90px;
+  }
+  
+  .hand-4 {
+    right: -75px !important;
+    width: 90px;
   }
   
   .card {
@@ -598,6 +649,12 @@ i {
   button[style*="position: fixed"][style*="bottom: 20px"][style*="right: 20px"] {
     bottom: 60px !important;
   }
+  
+  /* Updated mobile scoreboard layout */
+  .scoreboard .score-header,
+  .scoreboard .score-row {
+    display: none !important;
+  }
 }
 
 /* For smaller mobile devices */
@@ -623,4 +680,9 @@ i {
     width: 250px;
     font-size: 90%;
   }
+}
+
+/* Hide SKIP testing button */
+button[title="Skip current round (for testing only)"] {
+  display: none !important;
 }
