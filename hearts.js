@@ -209,7 +209,7 @@ async function startTrick(startingPlayer) {
                     controllerShowNotification("All hearts have been played. Click Deal."); 
                 } else {
                     // Generic message if round ended due to empty hands before 8 hearts
-                    controllerShowNotification(`Hearts Round Over! Click Deal.`); 
+                    controllerShowNotification(`Hearts Round Over! Click Next Round.`); 
                 }
             } else {
                  // Log if trick finished but round continues

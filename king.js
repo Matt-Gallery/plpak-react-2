@@ -180,7 +180,7 @@ async function startTrick(startingPlayer) {
 
             if (roundOver_king) {
                 console.log("King.js: Round Over condition met after trick.");
-                controllerShowNotification(`King of Hearts Round Over! Click Deal.`);
+                controllerShowNotification(`King of Hearts Round Over! Click Next Round.`);
             }
 
         } else if (roundOver_king) {

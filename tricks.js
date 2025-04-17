@@ -174,7 +174,7 @@ const deck_tricks = [
   
               if (roundOver_tricks) {
                   console.log("Tricks.js: Round Over condition met after trick.");
-                  controllerShowNotification(`Tricks Round Over! Click Deal.`);
+                  controllerShowNotification(`Tricks Round Over! Click Next Round.`);
               }
           } else if (roundOver_tricks) {
               // This case happens if checkRoundOver became true mid-loop (shouldn't for tricks?)

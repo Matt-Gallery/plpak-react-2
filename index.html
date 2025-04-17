@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Card Game</title>
     <link rel="stylesheet" href="./style.css" />
     <!-- Load Controller as an ES6 Module -->
@@ -58,6 +58,25 @@
     <!-- Notifications area -->
     <section class="notifications"></section>
 
+    <!-- Rules tooltip -->
+    <div class="tooltip">
+      <i class="info-icon" onclick="toggleTooltip(event)">Rules</i>
+      <ul><span class="tooltiptext">
+       <b>General Game Rules:</b>
+        <li class="tooltip-item">The player to the left of the dealer starts</li>
+        <li class="tooltip-item">The suit of the first card played in each round is the lead suit</li>
+        <li class="tooltip-item">If you have a card of the lead suit you must play it</li>
+        <li class="tooltip-item">The player with the highest card played of the lead suit takes each trick</li>
+        <li class="tooltip-item">The player who takes the trick starts the next round</li>
+        <li class="tooltip-item">The lowest score at the end of the game wins</li>
+        <b>Round Specific Rules:</b>
+        <li class="tooltip-item">Tricks Round: Each trick is worth 1 point</li>
+        <li class="tooltip-item">Hearts Round: Each heart is worth 1 point</li>
+        <li class="tooltip-item">Queens Round: Each queen is worth 2 points</li>
+        <li class="tooltip-item">King of Hearts Round: No heart can be played in the 1st trick & the king of hearts is worth 8 points</li>
+      </span></ul>
+    </div>
+
     <!-- Top hand (Player 3) -->
     <section class="tophand"></section>
 
@@ -82,20 +101,6 @@
     <section class="buttons">
       <button class="deal">Deal</button>
       <button class="next">Next Round</button>
-      <div class="tooltip">
-        <i class="info-icon">ℹ</i>
-        <ul><span class="tooltiptext">
-         <b>Game Rules:</b>
-          <li>The player to the left of the dealer starts</li>
-          <li>The suit of the first card played in each round is the lead suit</li>
-          <li>If you have a card of the lead suit you must play it</li>
-          <li>The player with the highest card played of the lead suit takes each trick</li>
-          <li>The player who takes the trick starts the next round</li>
-          <li>Each trick is 1 point</li>
-          <li>The lowest score wins</li>
-        </ul>
-        </span>
-      </div>
     </section>
   </body>
 </html>

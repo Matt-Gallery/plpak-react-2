@@ -195,7 +195,7 @@ async function startTrick(startingPlayer) {
                   controllerShowNotification("All queens have been played. Click Deal.");
               } else {
                   // Generic message if round ended due to empty hands before 4 queens
-                  controllerShowNotification(`Queens Round Over! Click Deal.`);
+                  controllerShowNotification(`Queens Round Over! Click Next Round.`);
               }
           }
 

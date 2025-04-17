@@ -163,15 +163,25 @@ function getCurrentRoundTitle() {
     const roundName = getCurrentRoundName();
     const cycleIndex = parseInt(localStorage.getItem('plpakCycleIndex') || '0');
     
-    // If no round name or game is complete, return "Game Over" or "Game Complete"
     if (!roundName) return "Game Complete!";
     
-    // Safety check - if cycleIndex is out of bounds, use the last cycle
     const safeIndex = cycleIndex < gameCycles.length ? cycleIndex : gameCycles.length - 1;
-    const startingPlayer = gameCycles[safeIndex].startingPlayer.replace('player', '');
+    const startingPlayer = gameCycles[safeIndex].startingPlayer;
     
-    // Add cycle/player info to the title
-    return `${roundTitles[roundName]} (Cycle ${cycleIndex + 1}, P${startingPlayer} starts)`;
+    // Determine the dealer (previous player)
+    let dealerNumber = parseInt(startingPlayer.replace('player', '')) - 1;
+    if (dealerNumber === 0) dealerNumber = 4; // Wrap around from player1 to player4
+    
+    const dealerName = `Player ${dealerNumber}`;
+    
+    // Replace Player 1 with saved player name if it exists
+    let displayName = dealerName;
+    if (dealerNumber === 1) {
+        const savedName = localStorage.getItem('plpakPlayerName');
+        if (savedName) displayName = savedName;
+    }
+    
+    return `${roundTitles[roundName]} - ${displayName} Dealing`;
 }
 
 function advanceToNextRound() {
@@ -271,28 +281,23 @@ function getTotalScores() {
 // Note: This function now primarily handles state updates from the module
 window.updateGameState = function(newState) {
     let stateChanged = false;
-    console.log("Controller: updateGameState received:", newState);
 
     if (newState.hasOwnProperty('roundOver')) {
         if(roundOver !== newState.roundOver) stateChanged = true;
         roundOver = newState.roundOver;
-        console.log(`Controller: roundOver state updated to ${roundOver}`);
     }
     if (newState.hasOwnProperty('gameStarted')) {
         if(gameStarted !== newState.gameStarted) stateChanged = true;
         gameStarted = newState.gameStarted;
-        console.log(`Controller: gameStarted state updated to ${gameStarted}`);
     }
     if (newState.hasOwnProperty('trickInProgress')) {
         if(trickInProgress !== newState.trickInProgress) stateChanged = true;
         trickInProgress = newState.trickInProgress;
-        console.log(`Controller: trickInProgress state updated to ${trickInProgress}`);
     }
     // NEW: Handle updates to the current round's score from the module
     if (newState.hasOwnProperty('currentRoundScore')) {
         if (JSON.stringify(currentRoundScore) !== JSON.stringify(newState.currentRoundScore)) {
              currentRoundScore = newState.currentRoundScore;
-             console.log(`Controller: currentRoundScore updated to ${currentRoundScore.join(',')}`);
              // Need to update display immediately when round score changes
              displayScores();
              stateChanged = true; // Mark change to update buttons if needed (though display already updated)
@@ -331,24 +336,7 @@ function displayScores() {
         // Calculate totals with current round
         const displayTotals = baseTotalScores.map((base, i) => base + (currentRoundScore[i] || 0));
         
-        // Generate detailed scoring log
-        let scoreLog = "Controller: Score breakdown:";
-        scoreLog += `\n- Current cycle index: ${currentCycleIndex}`;
-        scoreLog += `\n- Current round scores: ${currentRoundScore.join(', ')}`;
-        scoreLog += `\n- Base total scores: ${baseTotalScores.join(', ')}`;
-        scoreLog += `\n- Display totals: ${displayTotals.join(', ')}`;
-        
-        for (let cycle = 0; cycle < 4; cycle++) {
-            const cycleScores = gameCycles[cycle].scores;
-            scoreLog += `\n- Cycle ${cycle+1} scores: ${cycleScores.join(', ')}`;
-            if (cycle === currentCycleIndex) {
-                const withCurrentRound = cycleScores.map((score, idx) => score + (currentRoundScore[idx] || 0));
-                scoreLog += ` (with current round: ${withCurrentRound.join(', ')})`;
-            }
-        }
-        console.log(scoreLog);
-        
-        // Get all score elements for more granular control
+        // Group by player (every 5 elements: 4 cycles + 1 total)
         const allScoreEls = document.querySelectorAll('.score');
         if (allScoreEls && allScoreEls.length > 0) {
             // Group by player (every 5 elements: 4 cycles + 1 total)
@@ -405,19 +393,15 @@ function displayScores() {
 
 function updateButtonStates() {
      if (!dealButton || !nextButton) cacheDOMElements(); 
-     console.log(`Controller: Updating buttons based on state -> gameStarted=${gameStarted}, roundOver=${roundOver}`);
      if (roundOver) {
-         console.log("Controller: Setting Deal=ENABLED, Next=DISABLED (Round Over)");
          dealButton.disabled = false;
          nextButton.disabled = true;
          dealButton.textContent = "Next Hand";
      } else if (gameStarted) {
-          console.log("Controller: Setting Deal=DISABLED, Next=ENABLED (Game Started)");
           dealButton.disabled = true;
           nextButton.disabled = false;
           dealButton.textContent = "Deal";
      } else { // Not started yet (gameStarted is false, roundOver is false)
-          console.log("Controller: Setting Deal=ENABLED, Next=DISABLED (Initial/Ready State)"); 
           dealButton.disabled = false; // <<< Ensure Deal is ENABLED here
           nextButton.disabled = true;
           dealButton.textContent = "Deal";
@@ -458,23 +442,6 @@ function cacheDOMElements() {
         if (player4Hand) handsEls.player4 = player4Hand;
         
         notificationsEl = document.querySelector(".notifications");
-        
-        // Log missing essential elements
-        if(!roundTitleEl) console.warn("Failed to cache roundTitleEl");
-        if(!dealButton) console.warn("Failed to cache dealButton");
-        if(!nextButton) console.warn("Failed to cache nextButton");
-        if(!notificationsEl) console.warn("Failed to cache notificationsEl");
-        
-        // Log found elements
-        console.log("Controller: Cached DOM elements:", {
-            roundTitleEl: !!roundTitleEl,
-            dealButton: !!dealButton,
-            nextButton: !!nextButton,
-            scoreboardEls: scoreboardEls ? scoreboardEls.length : 0,
-            playAreas: Object.keys(playAreas),
-            handsEls: Object.keys(handsEls),
-            notificationsEl: !!notificationsEl
-        });
     } catch (err) {
         console.error("Error in cacheDOMElements:", err);
     }
@@ -821,17 +788,12 @@ function addNameResetButton() {
 
 // --- Button Handlers (Delegate to activeGame) ---
 function handleDealClick() {
-    console.log("Controller: Deal Clicked.");
-    console.log(`Controller: Checking state -> gameStarted=${gameStarted}, roundOver=${roundOver}`);
-
     if (roundOver) { 
         // --- Action 1: Advance to next round --- 
-        console.log("Controller: Round is marked over, advancing...");
         advanceToNextRound();
 
     } else if (!gameStarted && typeof activeGame.init === 'function') { 
         // --- Action 2: Initialize current round (Deal cards) --- 
-        console.log("Controller: Round not started, calling activeGame.init()...");
         activeGame.init(); // This deals cards and should call updateGameState
         
         // --- NEW: Auto-start first trick for Hearts, Queens, King --- 
@@ -839,7 +801,6 @@ function handleDealClick() {
         // If so, immediately trigger the first trick, unless it's the Tricks round 
         // (Tricks round auto-starts its first trick within its own init function).
         if (gameStarted && !trickInProgress && activeGame.name !== 'tricks') {
-             console.log(`Controller: Auto-starting first trick for round: ${activeGame.name}`);
              // Simulate clicking the "Next Trick" button
              handleNextTrickClick(); 
         }
@@ -848,7 +809,6 @@ function handleDealClick() {
 
     } else if (gameStarted) {
          // Deal clicked mid-round
-         console.log("Controller: Deal clicked but round already in progress.");
          showNotification("Round is already in progress."); 
     } else {
          // Unexpected state
@@ -857,15 +817,11 @@ function handleDealClick() {
 }
 
 function handleNextTrickClick() {
-    console.log("Controller: Next Trick Clicked.");
-     // Use controller's internal flags now
     // Prevent clicks if round is over, game not started, OR a trick is already running
     if (roundOver || !gameStarted || trickInProgress) {
-         console.log(`Controller: Ignoring Next Trick click (roundOver=${roundOver}, gameStarted=${gameStarted}, trickInProgress=${trickInProgress}).`);
          return;
     }
     if (typeof activeGame.startTrick === 'function') {
-        console.log("Controller: Setting trickInProgress = true and calling activeGame.startTrick...");
         trickInProgress = true;
         updateButtonStates();
         activeGame.startTrick(activeGame.currentStarter);
@@ -914,9 +870,13 @@ function showNotification(msg, dur) {
             notificationsEl = document.querySelector(".notifications");
         }
         
+        // Replace "Human" with the user's saved name
+        const playerName = localStorage.getItem('plpakPlayerName') || "Human";
+        const updatedMsg = msg.replace(/Human/g, playerName);
+        
         if (notificationsEl) {
             // Use solitaire-style notifications for all rounds
-            notificationsEl.innerHTML = `<div class="solitaire-notification">${msg}</div>`;
+            notificationsEl.innerHTML = `<div class="solitaire-notification">${updatedMsg}</div>`;
             
             // Default duration is 3000ms if not specified
             const duration = dur || 3000;
@@ -1132,4 +1092,44 @@ function updatePlayerNameInUI(name) {
             firstRowNameEl.textContent = name;
         }
     }
+}
+
+// Function to toggle tooltip visibility
+window.toggleTooltip = function(event) {
+    event.stopPropagation(); // Prevent the event from bubbling up
+    const tooltipTextEl = document.querySelector('.tooltiptext');
+    if (tooltipTextEl) {
+        tooltipTextEl.classList.toggle('visible');
+    }
+};
+
+// Function to update the tooltip text when hovering on the info-icon
+function updateTooltipText() {
+    // Remove console log statements
+    const tooltipTextEl = document.querySelector('.tooltiptext');
+    if (!tooltipTextEl) {
+        return;
+    }
+
+    const generalRules = `
+        <b>General Game Rules:</b>
+        <li>The player to the left of the dealer starts</li>
+        <li>The suit of the first card played in each round is the lead suit</li>
+        <li>If you have a card of the lead suit you must play it</li>
+        <li>The player with the highest card played of the lead suit takes each trick</li>
+        <li>The player who takes the trick starts the next round</li>
+        <li>The lowest score at the end of the game wins</li>
+    `;
+
+    const roundSpecificRules = {
+        'Tricks': '<b>Tricks Round Scoring: Each trick is 1 point</b>',
+        'Hearts': '<b>Hearts Round Scoring: Each heart is 1 point</b>',
+        'Queens': '<b>Queens Round Scoring: Each queen is 2 points</b>',
+        'King': '<b>King of Hearts Round Scoring: The king of hearts is 8 points</b><br><b>King of Hearts Round Special Rule: No heart can be played during the 1st trick</b>'
+    };
+
+    const currentRoundName = getCurrentRoundName();
+    const specificRules = roundSpecificRules[currentRoundName] || '';
+
+    tooltipTextEl.innerHTML = `${generalRules}${specificRules}`;
 } 
