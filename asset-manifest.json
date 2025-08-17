@@ -1,0 +1,14 @@
+{
+  "files": {
+    "main.css": "/plpak-react-2/static/css/main.c217d89b.css",
+    "main.js": "/plpak-react-2/static/js/main.6e9ac17a.js",
+    "static/media/logo 6.png": "/plpak-react-2/static/media/logo 6.b5b48fd100c3782700f3.png",
+    "index.html": "/plpak-react-2/index.html",
+    "main.c217d89b.css.map": "/plpak-react-2/static/css/main.c217d89b.css.map",
+    "main.6e9ac17a.js.map": "/plpak-react-2/static/js/main.6e9ac17a.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.c217d89b.css",
+    "static/js/main.6e9ac17a.js"
+  ]
+}
