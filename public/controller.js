@@ -450,7 +450,24 @@ function cacheDOMElements() {
 // --- Dynamic Script Loading & UI Setup --- 
 document.addEventListener('DOMContentLoaded', async () => {
     console.log("Controller: DOM Loaded.");
-    cacheDOMElements(); 
+    
+    // Wait for React to render the DOM elements
+    const waitForElements = () => {
+        const dealButton = document.querySelector(".deal");
+        const nextButton = document.querySelector(".next");
+        const roundTitle = document.querySelector(".round");
+        
+        if (dealButton && nextButton && roundTitle) {
+            console.log("Controller: All required DOM elements found, proceeding with initialization");
+            cacheDOMElements();
+            initializeController();
+        } else {
+            console.log("Controller: Waiting for React to render DOM elements...");
+            setTimeout(waitForElements, 100);
+        }
+    };
+    
+    const initializeController = async () => {
     
     // Add CSS to move the Total header right - using standard selectors
     const styleEl = document.createElement('style');
@@ -509,8 +526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // TEMPORARY: Add Skip Round button for testing
     addTemporarySkipButton();
 
-    // Add a name reset button for testing
-    addNameResetButton();
+    // Reset Name button is now handled by React components
     
     // Prompt for player name AFTER other UI elements are set up
     console.log("Controller: Prompting for player name...");
@@ -603,6 +619,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Show Game Complete notification with winner
         displayGameCompleteWithWinner();
     }
+    };
+    
+    // Start waiting for React to render the DOM elements
+    waitForElements();
 });
 
 // Function to display Game Complete notification with winner information
@@ -756,6 +776,19 @@ function addTemporarySkipButton() {
 
 // TEMPORARY: Function to add a name reset button
 function addNameResetButton() {
+    // Check if user is logged in - if so, don't show the reset button
+    const loggedInUser = localStorage.getItem('plpakUser');
+    if (loggedInUser) {
+        console.log("Controller: User is logged in, skipping reset name button");
+        return;
+    }
+    
+    // Remove any existing reset button first
+    const existingButton = document.querySelector('button[title="Change your player name"]');
+    if (existingButton) {
+        existingButton.remove();
+    }
+    
     // Create the button
     const resetButton = document.createElement('button');
     resetButton.textContent = '👤 Reset Name';
@@ -785,6 +818,9 @@ function addNameResetButton() {
     
     console.log("Controller: Added name reset button");
 }
+
+// Make the function globally available for React to call
+window.addNameResetButton = addNameResetButton;
 
 // --- Button Handlers (Delegate to activeGame) ---
 function handleDealClick() {
@@ -960,6 +996,9 @@ function promptForPlayerName() {
         winnerStyle.player1 = storedName;
     }
 }
+
+// Make the function globally available for React to call
+window.promptForPlayerName = promptForPlayerName;
 
 // Function to create a name input dialog in the UI
 function createNameInputDialog() {

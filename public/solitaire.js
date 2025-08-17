@@ -91,7 +91,7 @@ function initSolitaireRound() {
     isHumanTurn = false;
     humanPlayResolver = null;
     
-    // Add CSS to center cards on the board
+    // Add CSS to center cards on the board and adjust font sizes
     const style = document.createElement('style');
     style.textContent = `
         .board {
@@ -99,6 +99,10 @@ function initSolitaireRound() {
         }
         .board .card.board-card {
             transform-origin: center center;
+            font-size: 32px; /* Reduced from 40px by 20% */
+        }
+        .board .card.board-card span {
+            font-size: 26px; /* Reduced from 32px by 20% */
         }
         
         /* Fix board positioning in solitaire mode */
@@ -114,6 +118,16 @@ function initSolitaireRound() {
             top: 50%;
             transform: translate(-50%, -50%);
             margin: 0 auto;
+        }
+        
+        /* Mobile adjustments */
+        @media screen and (max-width: 768px) {
+            .board .card.board-card {
+                font-size: 22px; /* Reduced from 28px by 20% */
+            }
+            .board .card.board-card span {
+                font-size: 18px; /* Reduced from 22px by 20% */
+            }
         }
     `;
     document.head.appendChild(style);

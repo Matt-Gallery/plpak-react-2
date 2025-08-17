@@ -1,0 +1,172 @@
+/* Import the existing CSS file */
+@import './style.css';
+
+.App {
+  text-align: center;
+  min-height: 100vh;
+  background: green;
+  color: white;
+  font-family: Arial, sans-serif;
+} 
+/* Profile button and modal styles */
+.profile-button-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+}
+
+.login-btn, .logout-btn, .register-btn {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: 2px solid #4CAF50;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  margin-left: 5px;
+}
+
+.profile-btn {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: 2px solid #4CAF50;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  margin-left: 5px;
+  position: fixed;
+  top: 35px;
+  right: 340px;
+  z-index: 100;
+}
+
+.register-btn {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: 2px solid #4CAF50;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  margin-left: 5px;
+  position: fixed;
+  top: 35px;
+  right: 330px;
+  z-index: 100;
+}
+
+.login-btn:hover, .profile-btn:hover, .register-btn:hover {
+  background-color: rgba(0, 0, 0, 0.9);
+  border-color: #45a049;
+}
+
+.logout-btn {
+  border-color: #f44336;
+  position: fixed;
+  top: 35px;
+  right: 10px;
+  z-index: 100;
+}
+
+.login-btn {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: 2px solid #4CAF50;
+  padding: 8px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  margin-left: 5px;
+  position: fixed;
+  top: 35px;
+  right: 15px;
+  z-index: 100;
+}
+
+.logout-btn:hover {
+  background-color: rgba(0, 0, 0, 0.9);
+  border-color: #d32f2f;
+}
+
+.reset-name-btn {
+  background-color: #3498db !important;
+  color: white !important;
+  border: 2px solid black !important;
+  border-radius: 4px !important;
+  padding: 5px 10px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: bold !important;
+  position: fixed !important;
+  bottom: 20px !important;
+  left: 20px !important;
+  z-index: 9999 !important;
+  margin: 0 !important;
+  width: auto !important;
+  display: inline-block !important;
+}
+
+/* Override the mobile rule that targets buttons by title */
+.reset-name-btn[title="Change your player name"] {
+  bottom: 20px !important;
+  left: 20px !important;
+  right: auto !important;
+  font-size: 14px !important;
+  padding: 5px 10px !important;
+  width: auto !important;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.username {
+  color: #4CAF50;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.profile-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.profile-modal-content {
+  position: relative;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 1001;
+}
+
+.close-btn:hover {
+  color: #4CAF50;
+}
