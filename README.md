@@ -25,4 +25,4 @@ npm run build
 
 ## Deployment
 
-This app is configured for GitHub Pages deployment.
+This app is configured for GitHub Pages deployment using GitHub Actions.
